@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Pferd ansehen – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="view-actions">
+      <a class="btn" id="edit-link" href="#">✏️ Bearbeiten</a>
+      <a class="btn secondary" id="game-link" href="#" target="_blank" hidden>🔗 Zum Pferd</a>
+    </div>
+
+    <h2 id="v-name"></h2>
+    <p id="v-description" class="muted"></p>
+
+    <div class="form-grid">
+      <div><img id="v-image" src="" alt="" style="max-width: 220px; border-radius: 8px;" hidden /></div>
+    </div>
+
+    <fieldset>
+      <legend>Stammdaten</legend>
+      <table class="detail-table">
+        <tr><th>Geschlecht</th><td id="v-gender"></td></tr>
+        <tr><th>Rasse</th><td id="v-breed"></td></tr>
+        <tr><th>Alter</th><td id="v-age"></td></tr>
+      </table>
+    </fieldset>
+
+    <fieldset>
+      <legend>Passport</legend>
+      <table class="detail-table">
+        <tr><th>Genetic Potential (GP)</th><td id="v-gp"></td></tr>
+        <tr><th>Conformation</th><td id="v-conformation"></td></tr>
+        <tr><th>Tested Colours</th><td id="v-colours"></td></tr>
+        <tr><th>Training</th><td id="v-training"></td></tr>
+        <tr><th>Predicates</th><td id="v-predicates"></td></tr>
+        <tr><th>COI</th><td id="v-coi"></td></tr>
+      </table>
+    </fieldset>
+
+    <fieldset>
+      <legend>Optische Merkmale</legend>
+      <table class="detail-table">
+        <tr><th>Pangaré</th><td id="v-pangare"></td></tr>
+        <tr><th>Sooty</th><td id="v-sooty"></td></tr>
+        <tr><th>Flaxen</th><td id="v-flaxen"></td></tr>
+        <tr><th>Sabino</th><td id="v-sabino"></td></tr>
+      </table>
+    </fieldset>
+
+    <fieldset id="pedigree-fieldset" hidden>
+      <legend>Stammbaum</legend>
+      <div id="pedigree-fan" class="pedigree-fan"></div>
+    </fieldset>
+
+    <fieldset id="notes-fieldset" hidden>
+      <legend>Notizen</legend>
+      <p id="v-notes"></p>
+    </fieldset>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/horseView.js"></script>
+</body>
+</html>

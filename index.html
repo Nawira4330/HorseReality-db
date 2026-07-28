@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="list-page">
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn" href="horse.html">+ Neues Pferd</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <p id="flash-banner" class="flash-banner" hidden></p>
+
+    <section class="filter-bar">
+      <div class="filter-group">
+        <div class="filter-group-title">Suche</div>
+        <div class="filter-group-grid">
+          <div class="field">
+            <label for="f-name">Name</label>
+            <input type="text" id="f-name" placeholder="Name..." />
+          </div>
+          <div class="field">
+            <label for="f-gender">Geschlecht</label>
+            <select id="f-gender"><option value="">Alle</option></select>
+          </div>
+          <div class="field">
+            <label for="f-breed">Rasse</label>
+            <select id="f-breed"><option value="">Alle</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-title">Leistungswerte</div>
+        <div class="filter-group-grid">
+          <div class="field">
+            <label for="f-gp-min">GP mind.</label>
+            <input type="number" id="f-gp-min" />
+          </div>
+          <div class="field">
+            <label for="f-coi-max">COI max. (%)</label>
+            <input type="number" id="f-coi-max" step="0.01" />
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="reset-filters-btn" class="secondary">Zurücksetzen</button>
+        <button id="apply-filters-btn">Filtern</button>
+      </div>
+    </section>
+
+    <div class="list-header">
+      <span id="result-count" class="muted small"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="horse-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th data-sort="name">Name</th>
+            <th data-sort="gender">Geschlecht</th>
+            <th data-sort="breed">Rasse</th>
+            <th data-sort="genetic_potential">GP</th>
+            <th data-sort="conformation">Conformation</th>
+            <th>Genetik</th>
+            <th data-sort="coi">COI</th>
+            <th>Eltern</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="horse-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/list.js"></script>
+</body>
+</html>
