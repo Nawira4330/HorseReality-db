@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Fohlenvergleich – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <a class="btn secondary" href="inzucht.html">🧬 Inzuchtprüfer</a>
+      <a class="btn secondary" href="verpaarung.html">💞 Verpaarungsratgeber</a>
+      <a class="btn secondary" href="sortierhilfe.html">📊 Aussortierhilfe</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Fohlenvergleich</h2>
+    <p class="muted small">
+      Wähle ein Elternteil aus, um alle bekannten Nachkommen (Voll- und Halbgeschwister) nebeneinander zu vergleichen.
+      Grün = bester Wert der Gruppe, rot = schlechtester (bei GP/Conformation-Werten je Spalte separat ermittelt).
+    </p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="f-parent">Elternteil</label>
+        <select id="f-parent"><option value="">– auswählen –</option></select>
+      </div>
+    </div>
+
+    <div class="table-wrap" id="result-wrap" hidden>
+      <table id="compare-table"></table>
+    </div>
+    <p id="empty-note" class="muted small" hidden>Für dieses Pferd sind noch keine Nachkommen in der Datenbank verknüpft.</p>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/pedigree.js"></script>
+  <script src="js/vergleich.js"></script>
+</body>
+</html>

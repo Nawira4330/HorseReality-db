@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Aussortierhilfe – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="list-page">
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="filter-bar">
+      <div class="filter-group" style="flex: 1 1 260px;">
+        <div class="filter-group-title">Schwerpunkt für den Gesamt-Score</div>
+        <select id="f-focus">
+          <option value="conformation">Conformation</option>
+          <option value="gp">GP</option>
+          <option value="color">Farbe (Seltenheit)</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-title">Filtern</div>
+        <div class="filter-group-grid">
+          <div class="field">
+            <label for="f-breed">Rasse</label>
+            <select id="f-breed"><option value="">Alle</option></select>
+          </div>
+          <div class="field">
+            <label for="f-color">Farbe (Genetik enthält)</label>
+            <input type="text" id="f-color" placeholder="z.B. SW1, Cr, Ee..." />
+          </div>
+        </div>
+      </div>
+      <p class="muted small" style="flex-basis: 100%; margin: 0.3rem 0 0;">
+        <strong>Conformation-Score:</strong> gewichteter Durchschnitt je Körperteil-Note - nur VG = 100%,
+        nur G = 50%, nur A = 25%, nur BA = 0% (die Gesamtzahl bewerteter Körperteile ist nicht bei jedem
+        Pferd gleich, z.B. 14 oder 12 - es wird immer relativ zur tatsächlich vorhandenen Anzahl gerechnet).<br />
+        <strong>Gesamt-Score-Formel:</strong> gewichteter Durchschnitt aus GP, Conformation-Score und
+        Farb-Seltenheit (0-100 je Wert, gewählter Schwerpunkt zählt doppelt), danach Abzug von bis zu
+        30 Punkten für hohen Verwandtschaftsgrad (Ø-COI zum restlichen Bestand, relativ zum höchsten
+        Wert im Bestand), bis zu 20 Punkten für viele bereits vorhandene Nachkommen (relativ zum Pferd
+        mit den meisten Nachkommen), und bis zu 20 Punkten dafür, dass Sonderfarben/Musterungen (z.B.
+        Splash White, Cream, Tobiano...), die ein Elternteil aktiv trägt, nicht an dieses Pferd vererbt
+        wurden (nur prüfbar, wenn mind. ein Elternteil mit eigenen Tested Colours in der Datenbank
+        verknüpft ist). Je mehr ein Pferd also durch Verwandtschaft oder eigene Nachkommen im Bestand
+        vertreten ist, oder je mehr Sonderfarben der Eltern es nicht geerbt hat, desto niedriger der
+        Score. Alle Spalten einzeln per Klick auf die Überschrift sortierbar - der Gesamt-Score ist nur
+        eine Orientierungshilfe, keine feste Empfehlung.
+      </p>
+    </section>
+
+    <div class="list-header">
+      <span id="result-count" class="muted small"></span>
+      <div id="bulk-actions" hidden>
+        <span id="bulk-count" class="small"></span>
+        <button class="danger" id="bulk-delete-btn">Ausgewählte löschen</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="score-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all" /></th>
+            <th></th>
+            <th data-sort="name">Name</th>
+            <th data-sort="breed">Rasse</th>
+            <th data-sort="genetic_potential">GP</th>
+            <th data-sort="conformationScore">Conformation</th>
+            <th data-sort="tested_colours">Farbe / Genetik</th>
+            <th data-sort="specialTraitLossRatio">Sonderfarben von Eltern</th>
+            <th data-sort="relatedness">Verwandtschaftsgrad (Ø-COI)</th>
+            <th data-sort="offspringCount">Nachkommen</th>
+            <th data-sort="totalScore">Gesamt-Score</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="score-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/pedigree.js"></script>
+  <script src="js/genetics.js"></script>
+  <script src="js/sortierhilfe.js"></script>
+</body>
+</html>

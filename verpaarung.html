@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Verpaarungsratgeber – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <a class="btn secondary" href="inzucht.html">🧬 Inzuchtprüfer</a>
+      <a class="btn secondary" href="sortierhilfe.html">📊 Aussortierhilfe</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Verpaarungsratgeber</h2>
+    <p class="muted small">
+      Wähle Deckhengst und Stute, um eine grobe Einschätzung der möglichen Fohlen zu bekommen:
+      Inzuchtkoeffizient, GP-Bereich und mögliche Farbgenetik-Kombinationen. Alles hier ist eine
+      <strong>Schätzung</strong>, keine feste Vorhersage - immer mit den echten Werten im Spiel abgleichen.
+    </p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="f-sire">Deckhengst</label>
+        <select id="f-sire"><option value="">– auswählen –</option></select>
+      </div>
+      <div class="field">
+        <label for="f-dam">Stute</label>
+        <select id="f-dam"><option value="">– auswählen –</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button id="check-btn">Einschätzen</button>
+    </div>
+
+    <div id="result" hidden>
+      <fieldset>
+        <legend>Inzucht</legend>
+        <p id="result-coi" style="font-size: 1.2rem; font-weight: 600;"></p>
+        <p id="result-coi-note" class="muted small"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Genetic Potential (GP)</legend>
+        <p id="result-gp" style="font-size: 1.2rem; font-weight: 600;"></p>
+        <p class="muted small">Grobe Schätzung als Bereich zwischen den Eltern-Werten, keine bestätigte Vererbungsregel für Horse Reality.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Conformation der Eltern (zur Orientierung)</legend>
+        <table class="detail-table">
+          <tr><th id="result-sire-name-label">Deckhengst</th><td id="result-sire-conformation"></td></tr>
+          <tr><th id="result-dam-name-label">Stute</th><td id="result-dam-conformation"></td></tr>
+        </table>
+      </fieldset>
+
+      <fieldset id="genetics-fieldset" hidden>
+        <legend>Mögliche Farbgenetik-Kombinationen (Punnett-Schätzung)</legend>
+        <p class="muted small">
+          Best-effort aus "Tested Colours" beider Eltern - nicht erkennbare Genorte werden übersprungen.
+          Rohwerte: <span id="raw-sire-colours"></span> × <span id="raw-dam-colours"></span>
+        </p>
+        <div class="table-wrap"><table id="genetics-table"></table></div>
+      </fieldset>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/pedigree.js"></script>
+  <script src="js/genetics.js"></script>
+  <script src="js/verpaarung.js"></script>
+</body>
+</html>

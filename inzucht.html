@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Inzuchtprüfer – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <a class="btn secondary" href="verpaarung.html">💞 Verpaarungsratgeber</a>
+      <a class="btn secondary" href="vergleich.html">👯 Fohlenvergleich</a>
+      <a class="btn secondary" href="sortierhilfe.html">📊 Aussortierhilfe</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Inzuchtprüfer</h2>
+    <p class="muted small">
+      Berechnet den Inzuchtkoeffizienten (COI) für eine gedachte Verpaarung zweier Pferde,
+      anhand der gemeinsamen Vorfahren im (bis zu 18 Generationen tief aufgelösten) Stammbaum.
+      Je bekannter der Stammbaum beider Pferde, desto genauer das Ergebnis.
+    </p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="f-sire">Deckhengst</label>
+        <select id="f-sire"><option value="">– auswählen –</option></select>
+      </div>
+      <div class="field">
+        <label for="f-dam">Stute</label>
+        <select id="f-dam"><option value="">– auswählen –</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button id="check-btn">Prüfen</button>
+    </div>
+
+    <div id="result" hidden>
+      <fieldset>
+        <legend>Ergebnis</legend>
+        <p id="result-coi" style="font-size: 1.4rem; font-weight: 600;"></p>
+        <p id="result-note" class="muted small"></p>
+      </fieldset>
+
+      <fieldset id="common-ancestors-fieldset" hidden>
+        <legend>Gemeinsame Vorfahren</legend>
+        <div class="table-wrap"><table id="common-ancestors-table"></table></div>
+      </fieldset>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/pedigree.js"></script>
+  <script src="js/inzucht.js"></script>
+</body>
+</html>

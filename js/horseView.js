@@ -1,3 +1,5 @@
+const PEDIGREE_DISPLAY_GENERATIONS = 5;
+
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
@@ -17,6 +19,11 @@ async function init() {
   }
 
   render(horse);
+
+  const allHorses = await fetchAllHorsesLight();
+  const horsesByHrId = buildHorsesByHrId(allHorses);
+  renderPedigreeSection(horse, horsesByHrId);
+  renderOffspring(horse, allHorses);
 }
 
 function render(h) {
@@ -54,20 +61,52 @@ function render(h) {
     document.querySelector('#notes-fieldset').hidden = false;
     document.querySelector('#v-notes').textContent = h.notes;
   }
-
-  if (h.pedigree_tree && h.pedigree_tree.length) {
-    document.querySelector('#pedigree-fieldset').hidden = false;
-    document.querySelector('#pedigree-fan').innerHTML = renderPedigreeFan(h.pedigree_tree, h.name);
-  }
 }
 
 function setText(selector, value) {
   document.querySelector(selector).textContent = (value === null || value === undefined || value === '') ? '–' : value;
 }
 
-function renderPedigreeFan(tree, horseName) {
-  const maxGen = Math.max(...tree.map((t) => t.generation));
+// Stammbaum kann über mehrere eigene Pferde hinweg bis zu 18 Generationen
+// tief aufgelöst werden (siehe js/pedigree.js) - als komplettes Fächer-
+// Diagramm gerendert würde das aber bei tiefen, aber lückenhaften Zweigen
+// zu einer riesigen, größtenteils leeren Tabelle führen (2^17 Zeilen bei
+// voller Tiefe). Die Fächer-Ansicht zeigt deshalb nur die ersten
+// PEDIGREE_DISPLAY_GENERATIONS Generationen; die volle Tiefe fließt aber in
+// den Zusammenfassungstext und in den Inzuchtprüfer ein.
+function renderPedigreeSection(horse, horsesByHrId) {
+  const fullTree = buildDeepPedigree(horse, horsesByHrId, PEDIGREE_MAX_GENERATION);
+  const known = fullTree.filter((n) => n.hr_id);
+  if (known.length === 0) return;
 
+  document.querySelector('#pedigree-fieldset').hidden = false;
+  const deepestGen = Math.max(...known.map((n) => n.generation));
+  document.querySelector('#pedigree-summary').textContent =
+    `${known.length} bekannte Vorfahren, tiefste aufgelöste Generation: ${deepestGen}` +
+    (deepestGen > PEDIGREE_DISPLAY_GENERATIONS ? ` (Anzeige unten begrenzt auf ${PEDIGREE_DISPLAY_GENERATIONS} Generationen)` : '');
+
+  const displayTree = buildDeepPedigree(horse, horsesByHrId, PEDIGREE_DISPLAY_GENERATIONS);
+  document.querySelector('#pedigree-fan').innerHTML = renderPedigreeFan(displayTree, horse.name, PEDIGREE_DISPLAY_GENERATIONS);
+}
+
+function renderOffspring(horse, allHorses) {
+  const offspring = findOffspring(horse, allHorses);
+  if (offspring.length === 0) return;
+
+  document.querySelector('#offspring-fieldset').hidden = false;
+  const rows = offspring
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'))
+    .map((o) => `<tr>
+      <td><a href="view.html?id=${o.id}">${escapeHtml(o.name)}</a></td>
+      <td>${escapeHtml(o.gender || '')}</td>
+      <td>${o.genetic_potential ?? ''}</td>
+      <td>${escapeHtml(o.conformation || '')}</td>
+    </tr>`).join('');
+  document.querySelector('#offspring-table').innerHTML =
+    `<tr><th>Name</th><th>Geschlecht</th><th>GP</th><th>Conformation</th></tr>${rows}`;
+}
+
+function renderPedigreeFan(tree, horseName, maxGen) {
   function cellHtml(node, gen, rowspan) {
     const rs = rowspan ? ` rowspan="${rowspan}"` : '';
     if (node && node.name) {

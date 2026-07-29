@@ -270,6 +270,11 @@ td.actions-cell .btn:last-child, td.actions-cell button:last-child { margin-righ
 td.horse-thumb { width: 3.2rem; }
 td.horse-thumb img { width: 2.6rem; height: 2.6rem; object-fit: cover; border-radius: 6px; display: block; }
 
+td.cmp-good { background: rgba(var(--accent-rgb), 0.16); }
+td.cmp-good { color: var(--success); font-weight: 600; }
+td.cmp-bad { background: rgba(200, 65, 73, 0.14); }
+td.cmp-bad { color: var(--danger); font-weight: 600; }
+
 .pill {
   display: inline-block;
   padding: 0.1rem 0.5rem;
