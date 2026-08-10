@@ -1,9 +1,18 @@
-// Anmeldung mit einer echten E-Mail-Adresse (Supabase Auth kennt nur
-// E-Mail-Logins). Dieses Projekt ist bewusst persönlich (dein eigener
-// Horse-Reality-Account) - falls du später ein zweites Konto anlegen
-// willst (z.B. für einen Zuchtpartner/eine Zuchtpartnerin), funktioniert
-// das genau wie bei der MDR-Datenbank: im Supabase-Dashboard unter
-// "Authentication -> Users -> Add user" anlegen.
+// Supabase Auth kennt nur echte E-Mail-Logins. Damit auch Personen ohne
+// eigene E-Mail-Adresse (z.B. ein Zuchtpartner/eine Zuchtpartnerin) sich
+// mit einem einfachen Benutzernamen anmelden können, gilt dieselbe
+// Konvention wie bei der MDR-Datenbank: ein "Benutzername"-Konto bekommt
+// im Supabase-Dashboard die (frei erfundene, aber genau so zu schreibende)
+// E-Mail-Adresse "<benutzername>@benutzer.horsereality-datenbank.local".
+// Beim Anmelden reicht dann der Benutzername allein (ohne die "@..."-Domain).
+// Enthält die Eingabe ein "@", wird sie unverändert als echte E-Mail
+// behandelt (fürs Admin-/Haupt-Konto mit echter Adresse).
+const USERNAME_EMAIL_DOMAIN = '@benutzer.horsereality-datenbank.local';
+
+function resolveLoginEmail(identifier) {
+  return identifier.includes('@') ? identifier : identifier + USERNAME_EMAIL_DOMAIN;
+}
+
 async function requireSession() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {

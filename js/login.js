@@ -12,8 +12,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     errorBox.textContent = '';
 
-    const email = document.getElementById('email').value.trim();
+    const identifier = document.getElementById('identifier').value.trim();
     const password = document.getElementById('password').value;
+    const email = resolveLoginEmail(identifier);
 
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
