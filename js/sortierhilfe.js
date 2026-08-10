@@ -12,6 +12,7 @@ async function init() {
 
   document.querySelector('#f-focus').addEventListener('change', render);
   document.querySelector('#f-breed').addEventListener('change', render);
+  document.querySelector('#f-owner').addEventListener('change', render);
   document.querySelector('#f-color').addEventListener('input', render);
   document.querySelectorAll('#score-table th[data-sort]').forEach((th) => {
     th.addEventListener('click', () => {
@@ -27,6 +28,7 @@ async function init() {
   const allHorses = await fetchAllHorsesLight();
   scoredHorses = computeScores(allHorses);
   populateBreedFilter();
+  populateOwnerFilter();
   render();
 }
 
@@ -75,6 +77,17 @@ function populateBreedFilter() {
     const opt = document.createElement('option');
     opt.value = b;
     opt.textContent = b;
+    select.appendChild(opt);
+  });
+}
+
+function populateOwnerFilter() {
+  const owners = [...new Set(scoredHorses.map((h) => h.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const select = document.querySelector('#f-owner');
+  owners.forEach((o) => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
     select.appendChild(opt);
   });
 }
@@ -222,9 +235,11 @@ function totalScore(h, focus, ranges) {
 
 function getFiltered() {
   const breed = document.querySelector('#f-breed').value;
+  const owner = document.querySelector('#f-owner').value;
   const colorSearch = document.querySelector('#f-color').value.trim().toLowerCase();
   return scoredHorses.filter((h) => {
     if (breed && h.breed !== breed) return false;
+    if (owner && h.owner !== owner) return false;
     if (colorSearch && !(h.tested_colours || '').toLowerCase().includes(colorSearch)) return false;
     return true;
   });

@@ -24,6 +24,22 @@ async function init() {
   const horsesByHrId = buildHorsesByHrId(allHorses);
   renderPedigreeSection(horse, horsesByHrId);
   renderOffspring(horse, allHorses);
+  renderOpticalTraitHints(horse, horsesByHrId);
+}
+
+// Ergänzt Pangaré/Sooty/Flaxen/Sabino um einen aus den Eltern abgeleiteten
+// Hinweis, wenn der Wert bei diesem Pferd selbst noch nicht manuell gesetzt
+// ist - siehe js/genetics.js (inferOpticalTraitHint) für die je nach
+// Merkmal unterschiedliche Vererbungslogik (Flaxen/Sabino rezessiv+sicher,
+// Sooty/Pangaré nur als schwacher Hinweis).
+function renderOpticalTraitHints(horse, horsesByHrId) {
+  ['pangare', 'sooty', 'flaxen', 'sabino'].forEach((trait) => {
+    const hint = inferOpticalTraitHint(horse, trait, horsesByHrId);
+    if (!hint) return;
+    const cell = document.querySelector(`#v-${trait}`);
+    const hintSpan = `<span class="pill ${hint.level === 'strong' ? 'yes' : ''}" title="${escapeHtml(hint.text)}">${hint.level === 'strong' ? '●' : '○'} ${escapeHtml(hint.text)}</span>`;
+    cell.innerHTML = (horse[trait] ? escapeHtml(horse[trait]) + ' ' : '') + hintSpan;
+  });
 }
 
 function render(h) {
@@ -35,7 +51,6 @@ function render(h) {
   }
 
   document.querySelector('#v-name').textContent = h.name;
-  document.querySelector('#v-description').textContent = h.description || '';
 
   if (h.image_url) {
     const img = document.querySelector('#v-image');
@@ -45,11 +60,10 @@ function render(h) {
 
   setText('#v-gender', h.gender);
   setText('#v-breed', h.breed);
-  setText('#v-age', h.age_text);
+  setText('#v-owner', h.owner);
   setText('#v-gp', h.genetic_potential);
   setText('#v-conformation', h.conformation);
   setText('#v-colours', h.tested_colours);
-  setText('#v-training', h.training);
   setText('#v-predicates', h.predicates);
   setText('#v-coi', h.coi != null ? `${h.coi}%` : null);
   setText('#v-pangare', h.pangare);
@@ -60,6 +74,28 @@ function render(h) {
   if (h.notes) {
     document.querySelector('#notes-fieldset').hidden = false;
     document.querySelector('#v-notes').textContent = h.notes;
+  }
+
+  if (h.colors && h.colors.length) {
+    document.querySelector('#colors-fieldset').hidden = false;
+    const rows = h.colors.map((c) => `<tr>
+      <td>${escapeHtml(c.category || '')}</td>
+      <td>${escapeHtml(c.label)}${c.label !== c.technical_name ? ` <span class="muted small">(${escapeHtml(c.technical_name)})</span>` : ''}</td>
+      <td>${escapeHtml(c.genotype)}</td>
+    </tr>`).join('');
+    document.querySelector('#colors-table').innerHTML = `<tr><th>Gruppe</th><th>Genort</th><th>Genotyp</th></tr>${rows}`;
+  }
+
+  if (h.exterior && Object.keys(h.exterior).length) {
+    document.querySelector('#exterior-fieldset').hidden = false;
+    document.querySelector('#exterior-table').innerHTML =
+      Object.entries(h.exterior).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('');
+  }
+
+  if (h.disciplines && Object.keys(h.disciplines).length) {
+    document.querySelector('#disciplines-fieldset').hidden = false;
+    document.querySelector('#disciplines-table').innerHTML =
+      Object.entries(h.disciplines).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${v}</td></tr>`).join('');
   }
 }
 
@@ -111,7 +147,10 @@ function renderPedigreeFan(tree, horseName, maxGen) {
     const rs = rowspan ? ` rowspan="${rowspan}"` : '';
     if (node && node.name) {
       const marker = node.side === 'S' ? '♂' : '♀';
-      return `<td${rs}><div class="pedigree-node">${marker} <a href="${escapeHtml(node.link)}" target="_blank">${escapeHtml(node.name)}</a></div></td>`;
+      const stats = [node.genetic_potential != null ? `GP ${node.genetic_potential}` : null, node.conformation]
+        .filter(Boolean).join(', ');
+      const statsHtml = stats ? `<div class="muted small">${escapeHtml(stats)}</div>` : '';
+      return `<td${rs}><div class="pedigree-node">${marker} <a href="${escapeHtml(node.link)}" target="_blank">${escapeHtml(node.name)}</a>${statsHtml}</div></td>`;
     }
     return `<td${rs}><div class="pedigree-node unknown">Unbekannt</div></td>`;
   }

@@ -39,8 +39,10 @@ async function loadHorses() {
 function populateFilterOptions() {
   const genders = [...new Set(allHorses.map((h) => h.gender).filter(Boolean))].sort();
   const breeds = [...new Set(allHorses.map((h) => h.breed).filter(Boolean))].sort();
+  const owners = [...new Set(allHorses.map((h) => h.owner).filter(Boolean))].sort();
   fillSelect('#f-gender', genders);
   fillSelect('#f-breed', breeds);
+  fillSelect('#f-owner', owners);
 }
 
 function fillSelect(selector, values) {
@@ -57,6 +59,7 @@ function resetFilters() {
   document.querySelector('#f-name').value = '';
   document.querySelector('#f-gender').value = '';
   document.querySelector('#f-breed').value = '';
+  document.querySelector('#f-owner').value = '';
   document.querySelector('#f-gp-min').value = '';
   document.querySelector('#f-coi-max').value = '';
   render();
@@ -66,6 +69,7 @@ function getFiltered() {
   const name = document.querySelector('#f-name').value.trim().toLowerCase();
   const gender = document.querySelector('#f-gender').value;
   const breed = document.querySelector('#f-breed').value;
+  const owner = document.querySelector('#f-owner').value;
   const gpMin = document.querySelector('#f-gp-min').value;
   const coiMax = document.querySelector('#f-coi-max').value;
 
@@ -73,6 +77,7 @@ function getFiltered() {
     if (name && !h.name.toLowerCase().includes(name)) return false;
     if (gender && h.gender !== gender) return false;
     if (breed && h.breed !== breed) return false;
+    if (owner && h.owner !== owner) return false;
     if (gpMin && !(h.genetic_potential >= parseFloat(gpMin))) return false;
     if (coiMax && !(h.coi <= parseFloat(coiMax))) return false;
     return true;
@@ -117,6 +122,7 @@ function rowHtml(h) {
       <td data-label="Name">${nameCell}</td>
       <td data-label="Geschlecht">${escapeHtml(h.gender || '')}</td>
       <td data-label="Rasse">${escapeHtml(h.breed || '')}</td>
+      <td data-label="Besitzer">${escapeHtml(h.owner || '')}</td>
       <td data-label="GP">${h.genetic_potential ?? ''}</td>
       <td data-label="Conformation">${escapeHtml(h.conformation || '')}</td>
       <td data-label="Genetik" class="small">${genetics}</td>

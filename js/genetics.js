@@ -84,3 +84,77 @@ function computeSpecialTraitLoss(horse, horsesByHrId) {
   if (checked === 0) return null;
   return { lost, checked, lostCodes, lossRatio: lost / checked };
 }
+
+// --- Kompakter Gencode aus Tested Colours - für automatisch generierte
+// Namen (z.B. bei noch unbenannten "Foal Doe"-Pferden), exakt nach dem
+// Muster, das die Nutzerin selbst für ihre eigenen Pferdenamen verwendet
+// (z.B. "554 EA²SW1W21" aus "Ee AA gg SW1n W21n", "A 536 ELp" aus...):
+// je Genort nur der positive/dominante Code, "²" bei Homozygotie,
+// rein rezessive/negative Genorte (ee, aa, gg, n/n) werden weggelassen.
+// Verifiziert gegen ein echtes Pferd der Nutzerin (554): Ergebnis stimmt
+// exakt mit dem tatsächlichen Namen überein.
+function toCompactGeneCode(testedColours) {
+  if (!testedColours) return '';
+  const tokens = testedColours.trim().split(/\s+/);
+  const parts = [];
+  tokens.forEach((tok) => {
+    // 2-Buchstaben-Basisgen (Groß/Klein unterscheidet dominant/rezessiv): Ee/EE/ee
+    if (/^[A-Za-z]{2}$/.test(tok) && tok[0].toLowerCase() === tok[1].toLowerCase()) {
+      const isUpper1 = tok[0] === tok[0].toUpperCase();
+      const isUpper2 = tok[1] === tok[1].toUpperCase();
+      if (!isUpper1 && !isUpper2) return; // homozygot rezessiv (z.B. "ee") -> weglassen
+      parts.push(tok[0].toUpperCase() + (isUpper1 && isUpper2 ? '²' : ''));
+      return;
+    }
+    // "Coden" (heterozygoter Träger, z.B. "SW1n")
+    const mHet = tok.match(/^([A-Za-z]+\d*)n$/);
+    if (mHet) { parts.push(mHet[1]); return; }
+    // "CodeCode" (homozygot, z.B. "SW1SW1")
+    const half = tok.length / 2;
+    if (Number.isInteger(half) && half > 0 && tok.slice(0, half) === tok.slice(half)) {
+      parts.push(tok.slice(0, half) + '²');
+    }
+    // "n" bzw. "n/n" allein (komplett negativ) -> weglassen, kein weiterer Fall nötig
+  });
+  return parts.join('');
+}
+
+// --- Vererbungs-Hinweise für die optischen Merkmale (Pangaré/Sooty/Flaxen/
+// Sabino) anhand der Eltern - siehe reference/wiki-research.md. Die vier
+// Merkmale verhalten sich genetisch NICHT gleich, daher unterschiedliche
+// Sicherheit der Aussage:
+// - Flaxen und (Hidden) Sabino sind einfach rezessiv und ungetestet: zeigt
+//   ein Elternteil das Merkmal sichtbar, ist es garantiert reinerbig dafür
+//   und gibt daher garantiert mindestens eine Kopie weiter -> das Fohlen
+//   ist dann mindestens Träger ("stark").
+// - Sooty hat je nach Rasse/Basisfarbe wechselnde Dominanz (laut Horse-
+//   Reality-Wiki auf Bay-Basis oft dominant, auf Chestnut-Basis oft
+//   rezessiv) - keine sichere Ableitung möglich, nur ein schwacher Hinweis.
+// - Pangaré ist dominant: ein sichtbares Elternteil kann heterozygot sein
+//   und die Anlage nur zu 50% weitergeben - ebenfalls nur ein schwacher
+//   Hinweis, keine Garantie.
+const OPTICAL_TRAIT_INHERITANCE = {
+  flaxen: { level: 'strong', reason: 'rezessiv, Elternteil zeigt es nur reinerbig' },
+  sabino: { level: 'strong', reason: 'rezessiv, Elternteil zeigt es nur reinerbig' },
+  sooty: { level: 'weak', reason: 'Dominanz je nach Rasse/Basisfarbe unterschiedlich, nicht sicher ableitbar' },
+  pangare: { level: 'weak', reason: 'dominant, Elternteil könnte nur heterozygot sein (50% Chance)' },
+};
+
+// horsesByHrId muss pangare/sooty/flaxen/sabino enthalten (siehe
+// js/pedigree.js HORSE_LIGHT_COLUMNS). Gibt null zurück, wenn das Merkmal
+// bei diesem Pferd schon manuell gesetzt ist (kein Hinweis nötig) oder
+// keines der bekannten Elternteile das Merkmal sichtbar zeigt.
+function inferOpticalTraitHint(horse, trait, horsesByHrId) {
+  if (horse[trait] === 'ja' || horse[trait] === 'nein') return null;
+
+  const sire = horse.sire_hr_id ? horsesByHrId.get(horse.sire_hr_id) : null;
+  const dam = horse.dam_hr_id ? horsesByHrId.get(horse.dam_hr_id) : null;
+  const showingParent = [sire, dam].find((p) => p && p[trait] === 'ja');
+  if (!showingParent) return null;
+
+  const info = OPTICAL_TRAIT_INHERITANCE[trait];
+  const text = info.level === 'strong'
+    ? `mind. Träger (${showingParent.name} zeigt es, ${info.reason})`
+    : `möglich (${showingParent.name} zeigt es, ${info.reason})`;
+  return { level: info.level, text };
+}

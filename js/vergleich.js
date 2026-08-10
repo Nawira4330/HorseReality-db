@@ -10,30 +10,56 @@ async function init() {
 
   allHorses = await fetchAllHorsesLight();
 
+  populateOwnerFilter();
+  populateParentSelect();
+
+  document.querySelector('#f-owner').addEventListener('change', populateParentSelect);
+  document.querySelector('#f-parent').addEventListener('change', render);
+}
+
+function populateOwnerFilter() {
+  const owners = [...new Set(allHorses.map((h) => h.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const select = document.querySelector('#f-owner');
+  owners.forEach((o) => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    select.appendChild(opt);
+  });
+}
+
+function populateParentSelect() {
+  const owner = document.querySelector('#f-owner').value;
   const parentHrIds = new Set();
   allHorses.forEach((h) => {
     if (h.sire_hr_id) parentHrIds.add(h.sire_hr_id);
     if (h.dam_hr_id) parentHrIds.add(h.dam_hr_id);
   });
-  const parents = allHorses
+  let parents = allHorses
     .filter((h) => h.hr_id && parentHrIds.has(h.hr_id))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
+  if (owner) parents = parents.filter((h) => h.owner === owner);
 
   const select = document.querySelector('#f-parent');
+  select.innerHTML = '<option value="">– auswählen –</option>';
   parents.forEach((h) => {
     const opt = document.createElement('option');
     opt.value = h.hr_id;
     opt.textContent = h.name;
     select.appendChild(opt);
   });
-  select.addEventListener('change', render);
 
+  const emptyNote = document.querySelector('#empty-note');
   if (parents.length === 0) {
     select.disabled = true;
-    document.querySelector('#empty-note').hidden = false;
-    document.querySelector('#empty-note').textContent =
+    emptyNote.hidden = false;
+    emptyNote.textContent =
       'Noch keine Pferde mit verknüpften Nachkommen in der Datenbank (dafür müssen Stammbaum-Link und Fohlen beide gespeichert sein).';
+  } else {
+    select.disabled = false;
+    emptyNote.hidden = true;
   }
+  document.querySelector('#result-wrap').hidden = true;
 }
 
 function render() {

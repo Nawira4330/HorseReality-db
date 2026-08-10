@@ -1,5 +1,8 @@
 let editingId = null;
 let currentPedigreeTree = null;
+let currentColors = null;
+let currentDisciplines = null;
+let currentExterior = null;
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -12,6 +15,7 @@ async function init() {
   document.querySelector('#parse-btn').addEventListener('click', onParse);
   document.querySelector('#horse-form').addEventListener('submit', onSave);
   document.querySelector('#delete-btn').addEventListener('click', onDelete);
+  document.querySelector('#f-image').addEventListener('paste', onImagePaste);
 
   const params = new URLSearchParams(location.search);
   editingId = params.get('id');
@@ -30,7 +34,40 @@ async function loadExisting(id) {
     location.href = 'index.html';
     return;
   }
+  // Bereits gespeicherte strukturierte Daten vormerken, damit ein erneutes
+  // Speichern (ohne erneutes Einfügen) sie nicht verliert.
+  if (data.colors) currentColors = data.colors;
+  if (data.disciplines) currentDisciplines = data.disciplines;
+  if (data.exterior) currentExterior = data.exterior;
   fillForm(data);
+}
+
+// Erlaubt das Einfügen eines direkt kopierten Bilds (z.B. per Rechtsklick
+// "Bild kopieren" im Browser auf der Pferdeseite, dann Strg+V hier) statt
+// nur einer Bild-URL - wird automatisch in den "horse-images"-Storage-
+// Bucket hochgeladen (siehe supabase/schema.sql) und die entstehende
+// öffentliche URL ins Feld eingetragen.
+async function onImagePaste(e) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  const imageItem = [...items].find((item) => item.type.startsWith('image/'));
+  if (!imageItem) return; // normaler Text-Paste (z.B. eine getippte URL) - unverändert lassen
+
+  e.preventDefault();
+  const file = imageItem.getAsFile();
+  const ext = file.type.split('/')[1] || 'png';
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const field = document.querySelector('#f-image');
+  field.value = 'Bild wird hochgeladen...';
+  const { error } = await supabaseClient.storage.from('horse-images').upload(path, file);
+  if (error) {
+    field.value = '';
+    alert('Fehler beim Bild-Upload: ' + error.message);
+    return;
+  }
+  const { data } = supabaseClient.storage.from('horse-images').getPublicUrl(path);
+  field.value = data.publicUrl;
 }
 
 function onParse() {
@@ -45,16 +82,14 @@ function onParse() {
 // Einfügen (z.B. nur der Colour-Reiter) diese Felder nicht enthält.
 function fillForm(parsed) {
   setIf('#f-name', parsed.name);
-  setIf('#f-description', parsed.description);
   setIf('#f-gender', parsed.gender);
   setIf('#f-breed', parsed.breed);
-  setIf('#f-age', parsed.age_text);
+  setIf('#f-owner', parsed.owner);
   setIf('#f-link', parsed.link);
   setIf('#f-image', parsed.image_url);
   setIf('#f-gp', parsed.genetic_potential);
   setIf('#f-conformation', parsed.conformation);
   setIf('#f-colours', parsed.tested_colours);
-  setIf('#f-training', parsed.training);
   setIf('#f-predicates', parsed.predicates);
   setIf('#f-coi', parsed.coi);
   setIf('#f-pangare', parsed.pangare);
@@ -67,6 +102,26 @@ function fillForm(parsed) {
     currentPedigreeTree = parsed.pedigree_tree;
     renderPedigreePreview(parsed.pedigree_tree);
   }
+  if (parsed.colors && parsed.colors.length) {
+    currentColors = parsed.colors;
+    renderStructuredPreview('#colors-preview', '#colors-fieldset',
+      parsed.colors.map((c) => `${c.label} (${c.technical_name}): ${c.genotype}`).join(' · '));
+  }
+  if (parsed.disciplines) {
+    currentDisciplines = parsed.disciplines;
+    renderStructuredPreview('#disciplines-preview', '#disciplines-fieldset',
+      Object.entries(parsed.disciplines).map(([k, v]) => `${k}: ${v}`).join(' · '));
+  }
+  if (parsed.exterior) {
+    currentExterior = parsed.exterior;
+    renderStructuredPreview('#exterior-preview', '#exterior-fieldset',
+      Object.entries(parsed.exterior).map(([k, v]) => `${k}: ${v}`).join(' · '));
+  }
+}
+
+function renderStructuredPreview(previewSelector, fieldsetSelector, text) {
+  document.querySelector(fieldsetSelector).hidden = false;
+  document.querySelector(previewSelector).textContent = text;
 }
 
 function setIf(selector, value) {
@@ -85,7 +140,11 @@ function renderPedigreePreview(tree) {
 
   const lines = tree
     .filter((t) => t.name)
-    .map((t) => `<div>${'　'.repeat(t.generation - 1)}${t.side === 'S' ? '♂' : '♀'} <a href="${escapeHtml(t.link)}" target="_blank">${escapeHtml(t.name)}</a> <span class="muted small">(Gen. ${t.generation})</span></div>`)
+    .map((t) => {
+      const stats = [t.genetic_potential != null ? `GP ${t.genetic_potential}` : null, t.conformation]
+        .filter(Boolean).join(', ');
+      return `<div>${'　'.repeat(t.generation - 1)}${t.side === 'S' ? '♂' : '♀'} <a href="${escapeHtml(t.link)}" target="_blank">${escapeHtml(t.name)}</a> <span class="muted small">(Gen. ${t.generation}${stats ? ' · ' + escapeHtml(stats) : ''})</span></div>`;
+    })
     .join('');
   document.querySelector('#pedigree-preview').innerHTML = lines || '<p class="muted small">Keine bekannten Vorfahren im eingefügten Text.</p>';
 }
@@ -108,19 +167,17 @@ function textOrNull(value) {
 
 function buildPayload() {
   const link = document.querySelector('#f-link').value.trim();
+  const owner = document.querySelector('#f-owner').value.trim();
   const payload = {
     name: document.querySelector('#f-name').value.trim(),
-    description: textOrNull(document.querySelector('#f-description').value.trim()),
     gender: textOrNull(document.querySelector('#f-gender').value),
     breed: textOrNull(document.querySelector('#f-breed').value.trim()),
-    age_text: textOrNull(document.querySelector('#f-age').value.trim()),
     link: textOrNull(link),
     hr_id: extractHrIdFromLink(link),
     image_url: textOrNull(document.querySelector('#f-image').value.trim()),
     genetic_potential: numOrNull(document.querySelector('#f-gp').value),
     conformation: textOrNull(document.querySelector('#f-conformation').value.trim()),
     tested_colours: textOrNull(document.querySelector('#f-colours').value.trim()),
-    training: textOrNull(document.querySelector('#f-training').value.trim()),
     predicates: textOrNull(document.querySelector('#f-predicates').value.trim()),
     coi: numOrNull(document.querySelector('#f-coi').value),
     pangare: textOrNull(document.querySelector('#f-pangare').value),
@@ -137,6 +194,13 @@ function buildPayload() {
     if (sire && sire.hr_id) { payload.sire_hr_id = sire.hr_id; payload.sire_name = sire.name; payload.sire_link = sire.link; }
     if (dam && dam.hr_id) { payload.dam_hr_id = dam.hr_id; payload.dam_name = dam.name; payload.dam_link = dam.link; }
   }
+  if (currentColors) payload.colors = currentColors;
+  if (currentDisciplines) payload.disciplines = currentDisciplines;
+  if (currentExterior) payload.exterior = currentExterior;
+  // "owner" nur mitschicken, wenn tatsächlich ausgefüllt - so bricht das
+  // Speichern nicht, solange migration_001_owner.sql noch nicht ausgeführt
+  // wurde (die Spalte existiert dann noch nicht in der Datenbank).
+  if (owner) payload.owner = owner;
   return payload;
 }
 

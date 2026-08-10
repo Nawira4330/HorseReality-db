@@ -25,7 +25,6 @@
     </div>
 
     <h2 id="v-name"></h2>
-    <p id="v-description" class="muted"></p>
 
     <div class="form-grid">
       <div><img id="v-image" src="" alt="" style="max-width: 220px; border-radius: 8px;" hidden /></div>
@@ -36,7 +35,7 @@
       <table class="detail-table">
         <tr><th>Geschlecht</th><td id="v-gender"></td></tr>
         <tr><th>Rasse</th><td id="v-breed"></td></tr>
-        <tr><th>Alter</th><td id="v-age"></td></tr>
+        <tr><th>Besitzer</th><td id="v-owner"></td></tr>
       </table>
     </fieldset>
 
@@ -46,7 +45,6 @@
         <tr><th>Genetic Potential (GP)</th><td id="v-gp"></td></tr>
         <tr><th>Conformation</th><td id="v-conformation"></td></tr>
         <tr><th>Tested Colours</th><td id="v-colours"></td></tr>
-        <tr><th>Training</th><td id="v-training"></td></tr>
         <tr><th>Predicates</th><td id="v-predicates"></td></tr>
         <tr><th>COI</th><td id="v-coi"></td></tr>
       </table>
@@ -60,6 +58,21 @@
         <tr><th>Flaxen</th><td id="v-flaxen"></td></tr>
         <tr><th>Sabino</th><td id="v-sabino"></td></tr>
       </table>
+    </fieldset>
+
+    <fieldset id="colors-fieldset" hidden>
+      <legend>Farbgenetik</legend>
+      <div class="table-wrap"><table id="colors-table"></table></div>
+    </fieldset>
+
+    <fieldset id="exterior-fieldset" hidden>
+      <legend>Exterieur/Gangarten-Bewertung</legend>
+      <table class="detail-table" id="exterior-table"></table>
+    </fieldset>
+
+    <fieldset id="disciplines-fieldset" hidden>
+      <legend>Disziplin-Potenzialwerte</legend>
+      <table class="detail-table" id="disciplines-table"></table>
     </fieldset>
 
     <fieldset id="pedigree-fieldset" hidden>
@@ -83,6 +96,7 @@
   <script src="js/supabaseClient.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/pedigree.js"></script>
+  <script src="js/genetics.js"></script>
   <script src="js/horseView.js"></script>
 </body>
 </html>

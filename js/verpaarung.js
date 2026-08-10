@@ -12,15 +12,35 @@ async function init() {
   allHorses = await fetchAllHorsesLight();
   horsesByHrId = buildHorsesByHrId(allHorses);
 
-  const sorted = [...allHorses].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
+  populateOwnerFilter();
+  populateHorseSelects();
+
+  document.querySelector('#f-owner').addEventListener('change', populateHorseSelects);
+  document.querySelector('#check-btn').addEventListener('click', onCheck);
+}
+
+function populateOwnerFilter() {
+  const owners = [...new Set(allHorses.map((h) => h.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const select = document.querySelector('#f-owner');
+  owners.forEach((o) => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    select.appendChild(opt);
+  });
+}
+
+function populateHorseSelects() {
+  const owner = document.querySelector('#f-owner').value;
+  const filtered = owner ? allHorses.filter((h) => h.owner === owner) : allHorses;
+  const sorted = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
   fillSelect('#f-sire', sorted);
   fillSelect('#f-dam', sorted);
-
-  document.querySelector('#check-btn').addEventListener('click', onCheck);
 }
 
 function fillSelect(selector, horses) {
   const select = document.querySelector(selector);
+  select.innerHTML = '<option value="">– auswählen –</option>';
   horses.forEach((h) => {
     const opt = document.createElement('option');
     opt.value = h.id;

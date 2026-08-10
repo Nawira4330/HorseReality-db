@@ -54,6 +54,17 @@ function extractHrId(url) {
 
 const LINK_LINE_RE = /^\[(.+?)\]\((https?:\/\/\S+?)\)$/;
 
+// Erkennt das Pferdebild im eingefügten Text: entweder ein Markdown-
+// Bildlink "![...](url)" (falls die Zwischenablage die Seite so umwandelt)
+// oder ersatzweise die erste rohe Bild-URL (Dateiendung jpg/png/webp) im
+// gesamten Text. Best effort - liefert null, wenn nichts gefunden wird.
+function extractImageUrl(rawText) {
+  const mdMatch = rawText.match(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/);
+  if (mdMatch) return mdMatch[1];
+  const bareMatch = rawText.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)\b/i);
+  return bareMatch ? bareMatch[0] : null;
+}
+
 function findLineIndex(lines, predicate, from = 0) {
   for (let i = from; i < lines.length; i++) {
     if (predicate(lines[i])) return i;
@@ -63,30 +74,37 @@ function findLineIndex(lines, predicate, from = 0) {
 
 // Sucht eine "Label"-Zeile (z.B. "Genetic Potential") und gibt die nächste
 // nicht-leere Zeile danach als Wert zurück - Horse Reality zeigt Label und
-// Wert im kopierten Text jeweils auf eigenen Zeilen.
-function findLabelValue(lines, label, from = 0) {
+// Wert im kopierten Text jeweils auf eigenen Zeilen. "to" begrenzt die Suche
+// nach oben (z.B. bis zum nächsten Abschnitt), damit bei mehreren
+// hintereinander eingefügten Reitern keine Verwechslung mit gleichnamigen
+// Überschriften aus einem späteren Abschnitt passiert.
+function findLabelValue(lines, label, from = 0, to = lines.length) {
   const idx = findLineIndex(lines, (l) => l === label, from);
-  if (idx === -1) return null;
-  for (let i = idx + 1; i < lines.length; i++) {
+  if (idx === -1 || idx >= to) return null;
+  for (let i = idx + 1; i < to; i++) {
     if (lines[i]) return { value: lines[i], index: i };
   }
   return null;
 }
 
+// Abzeichen-Texte, die manchmal als reiner Text statt als Link im kopierten
+// Text stehen (je nachdem wie Horse Reality die Seite gerade rendert) -
+// dürfen nie als Beschreibung oder Rasse missverstanden werden.
+const BADGE_WORDS = new Set(['Foundation Breeder', 'BETA', 'Needs care', 'Care']);
+
 function parseHeaderBlock(lines) {
   const result = {};
   if (!lines[0]) return result;
   result.name = lines[0];
-  if (lines[1] && lines[1] !== 'Stallion' && lines[1] !== 'Mare' && lines[1] !== 'Gelding') {
+  const genderRe = /^(Stallion|Mare|Gelding|Colt|Filly)$/i;
+  if (lines[1] && !genderRe.test(lines[1]) && !BADGE_WORDS.has(lines[1])) {
     result.description = lines[1];
   }
-  const genderRe = /^(Stallion|Mare|Gelding|Colt|Filly)$/i;
   const ageRe = /\d+\s*(years?|months?)/i;
-  const stopWords = new Set(['BETA', 'Needs care', 'Care', '']);
 
   for (let i = 1; i < Math.min(lines.length, 12); i++) {
     const line = lines[i];
-    if (!line || stopWords.has(line) || LINK_LINE_RE.test(line)) continue;
+    if (!line || BADGE_WORDS.has(line) || LINK_LINE_RE.test(line)) continue;
     if (genderRe.test(line)) result.gender = line;
     else if (ageRe.test(line)) result.age_text = line;
     else if (line === '* Care' || line.startsWith('* ')) break; // Reiter-Navigation erreicht
@@ -99,24 +117,157 @@ function parsePassportBlock(lines) {
   const result = {};
   const passportIdx = findLineIndex(lines, (l) => l === 'Passport');
   if (passportIdx === -1) return result;
+  // Auf den Pedigree-Abschnitt begrenzen, damit bei mehreren eingefügten
+  // Reitern in derselben Box keine gleichnamige Überschrift eines späteren
+  // Abschnitts (z.B. die eigene "Conformation"-Überschrift im Stats-Reiter)
+  // fälschlich als Passport-Wert gelesen wird.
+  const pedigreeIdx = findLineIndex(lines, (l) => l === 'Pedigree', passportIdx);
+  const end = pedigreeIdx === -1 ? lines.length : pedigreeIdx;
 
-  const gp = findLabelValue(lines, 'Genetic Potential', passportIdx);
+  const gp = findLabelValue(lines, 'Genetic Potential', passportIdx, end);
   if (gp) {
     const n = parseFloat(gp.value.replace(',', '.'));
     if (!Number.isNaN(n)) result.genetic_potential = n;
   }
-  const conformation = findLabelValue(lines, 'Conformation', passportIdx);
+  const conformation = findLabelValue(lines, 'Conformation', passportIdx, end);
   if (conformation) result.conformation = conformation.value;
 
-  const testedColours = findLabelValue(lines, 'Tested Colours', passportIdx);
+  const testedColours = findLabelValue(lines, 'Tested Colours', passportIdx, end);
   if (testedColours) result.tested_colours = testedColours.value;
 
-  const training = findLabelValue(lines, 'Training', passportIdx);
+  const training = findLabelValue(lines, 'Training', passportIdx, end);
   if (training) result.training = training.value;
 
-  const predicates = findLabelValue(lines, 'Predicates', passportIdx);
+  const predicates = findLabelValue(lines, 'Predicates', passportIdx, end);
   if (predicates && predicates.value !== '-') result.predicates = predicates.value;
 
+  return result;
+}
+
+// --- Colour-Reiter: Farbgenetik-Tabelle je Genort ---
+// Aufbau im kopierten Text: 3 Zeilen je Genort (Anzeige-Label, technischer
+// Genname, Genotyp "Allel1 / Allel2"), gruppiert unter Zwischenüberschriften
+// wie "Colours & Modifiers", "Dilutions", "White Patterns". Wird über ein
+// 2-Zeilen-Lookahead erkannt (Label + technischer Name + darauffolgende
+// Genotyp-Zeile), alles andere gilt als Gruppen-Überschrift.
+const GENOTYPE_PAIR_RE = /^(\S+)\s*\/\s*(\S+)$/;
+
+function parseColourBlock(lines) {
+  const startIdx = findLineIndex(lines, (l) => l === 'Colours & Patterns');
+  if (startIdx === -1) return null;
+  const endIdx = findLineIndex(lines, (l) => l === 'Genetic potential', startIdx);
+  const end = endIdx === -1 ? lines.length : endIdx;
+
+  const loci = [];
+  let currentCategory = null;
+  let i = startIdx + 1;
+  while (i < end) {
+    const line = lines[i];
+    if (!line) { i++; continue; }
+    const next1 = lines[i + 1];
+    const next2 = lines[i + 2];
+    if (i + 2 < end && next1 && next2 && GENOTYPE_PAIR_RE.test(next2)) {
+      const m = next2.match(GENOTYPE_PAIR_RE);
+      loci.push({
+        category: currentCategory,
+        label: line,
+        technical_name: next1,
+        genotype: next2,
+        allele1: m[1],
+        allele2: m[2],
+      });
+      i += 3;
+      continue;
+    }
+    currentCategory = line;
+    i++;
+  }
+  return loci;
+}
+
+// --- "Genetic potential" Abschnitt (folgt direkt auf den Colour-Reiter im
+// Spiel) - GP-Gesamtwert (zum Abgleich mit dem Passport-Wert) und die
+// Disziplin-/Eigenschafts-Potenzialwerte (Acceleration, Agility, ...). Stoppt
+// beim ersten nicht-numerischen Wert (z.B. Bild-Bildunterschrift danach).
+function parseDisciplinesBlock(lines) {
+  const idx = findLineIndex(lines, (l) => l === 'Genetic potential');
+  if (idx === -1) return null;
+
+  let i = idx + 1;
+  let gpTotal = null;
+  const gpMatch = lines[i] && lines[i].match(/^GP total:\s*([\d.,]+)/i);
+  if (gpMatch) {
+    gpTotal = parseFloat(gpMatch[1].replace(',', '.'));
+    i++;
+  }
+
+  const disciplines = {};
+  while (i + 1 < lines.length) {
+    const label = lines[i];
+    const value = lines[i + 1];
+    if (!label || !value || !/^\d+([.,]\d+)?$/.test(value)) break;
+    disciplines[label] = parseFloat(value.replace(',', '.'));
+    i += 2;
+  }
+  return { gpTotal, disciplines };
+}
+
+// --- Beschreibende Exterieur-/Gangarten-Bewertung (Stats-Reiter) - je
+// Gangart (Walk/Trot/Canter/Gallop) und Körperteil (Posture/Head/Neck/...)
+// eine Note aus einem festen Wortschatz. Diese Summe ergibt genau den
+// Passport-Wert "Conformation" (z.B. 2x Good + 3x Average + 7x Below
+// average = "2G 3A 7BA"). Da "Conformation" auch als Passport-Label
+// vorkommt, wird gezielt die Überschrift genommen, der direkt eine
+// bekannte Note folgt (nicht die erste "Conformation"-Zeile im Text).
+const CONFORMATION_GRADE_WORDS = ['Excellent', 'Very good', 'Good', 'Average', 'Below average', 'Poor', 'Bad'];
+
+function parseConformationDescriptiveBlock(lines) {
+  // Anchor: "Conformation" heading, gefolgt von (Label, Note)-Paaren, z.B.
+  // "Conformation" / "Walk" / "Good" - die Note steht also 2 Zeilen später,
+  // nicht direkt danach (das wäre die Passport-"Conformation"-Zeile).
+  const idx = lines.findIndex((l, i) => l === 'Conformation' && CONFORMATION_GRADE_WORDS.includes(lines[i + 2]));
+  if (idx === -1) return null;
+
+  let i = idx + 1;
+  const items = {};
+  while (i + 1 < lines.length) {
+    const label = lines[i];
+    const value = lines[i + 1];
+    if (!label || !CONFORMATION_GRADE_WORDS.includes(value)) break;
+    items[label] = value;
+    i += 2;
+  }
+  return items;
+}
+
+// Vorfahren mit bekanntem Stammbaum zeigen zusätzlich zum Namen 1-2 weitere
+// Zeilen mit demselben Link: bei Foundation-Breeder-Pferden nur ein
+// Abzeichen ("Foundation Breeder"), bei regulär gezüchteten Pferden ein
+// Werte-Badge (GP/Conformation/Score, z.B. "☆ 826/13:1:0:0/91.573") gefolgt
+// vom Stall-Namen. Das Badge-Format ist NICHT einheitlich - jede Person
+// schreibt den Untertitel ihrer Pferde anders (z.B. "804|12|91.398GGGGG-E"
+// oder "817 14VG" oder "800 10VG ret"). Best effort: die ersten
+// Ziffern-vor-"/"-oder-"|" werden als GP interpretiert, "NNVG..." oder
+// "N:N:N:N" als Conformation - beides wird nur übernommen, wenn ein
+// Muster eindeutig passt, der komplette Rohtext bleibt in "badge" immer
+// erhalten, damit nichts verloren geht.
+function extractAncestorStats(extraLines) {
+  const badge = extraLines.join(' · ') || null;
+  let genetic_potential = null;
+  let conformation = null;
+  for (const line of extraLines) {
+    if (genetic_potential == null) {
+      const gpMatch = line.match(/(\d{2,4})\s*[/|]/);
+      if (gpMatch) genetic_potential = parseInt(gpMatch[1], 10);
+    }
+    if (conformation == null) {
+      const confMatch = line.match(/(\d+\s*VG[\w\s+*.-]*)/i) || line.match(/(\d+:\d+:\d+:\d+)/);
+      if (confMatch) conformation = confMatch[1].trim();
+    }
+  }
+  const result = { badge };
+  if (genetic_potential != null) result.genetic_potential = genetic_potential;
+  if (conformation != null) result.conformation = conformation;
   return result;
 }
 
@@ -143,16 +294,21 @@ function parsePedigreeBlock(lines) {
     if (m) {
       const [, text, url] = m;
       const hrId = extractHrId(url);
+      // Direkt nach Name/Link folgen oft weitere Zeilen mit demselben Link
+      // (Foundation-Breeder-Pferde: 1 Abzeichen "Foundation Breeder";
+      // regulär gezüchtete Pferde: Werte-Badge + Stall-Name, siehe
+      // extractAncestorStats) - das sind keine eigenen Stammbaum-Plätze,
+      // sondern gehören noch zum gerade gefundenen Vorfahren.
+      const extraLines = [];
       let next = i + 1;
-      // Direkt nach Name/Link folgt oft eine zweite Zeile mit demselben
-      // Link (z.B. ein "Foundation Breeder"-Abzeichen oder die Rasse) -
-      // das ist kein eigener Stammbaum-Platz, sondern gehört noch zum
-      // gerade gefundenen Vorfahren, und wird übersprungen.
-      if (next < end) {
+      while (next < end) {
         const nm = lines[next] && lines[next].match(LINK_LINE_RE);
-        if (nm && extractHrId(nm[2]) === hrId) next++;
+        if (nm && extractHrId(nm[2]) === hrId) {
+          extraLines.push(nm[1]);
+          next++;
+        } else break;
       }
-      entries.push({ name: text, link: url, hr_id: hrId });
+      entries.push({ name: text, link: url, hr_id: hrId, ...extractAncestorStats(extraLines) });
       i = next;
     } else if (/^unknown$/i.test(line)) {
       entries.push(null);
@@ -175,6 +331,9 @@ function parsePedigreeBlock(lines) {
       hr_id: e ? e.hr_id : null,
       name: e ? e.name : null,
       link: e ? e.link : null,
+      genetic_potential: e && e.genetic_potential != null ? e.genetic_potential : null,
+      conformation: e && e.conformation != null ? e.conformation : null,
+      badge: e && e.badge != null ? e.badge : null,
     };
   });
   return { coi, tree };
@@ -184,6 +343,9 @@ function parseHorseRealityText(rawText) {
   const lines = rawText.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim());
 
   const result = { raw_text_info: rawText };
+
+  const imageUrl = extractImageUrl(rawText);
+  if (imageUrl) result.image_url = imageUrl;
 
   Object.assign(result, parseHeaderBlock(lines));
   Object.assign(result, parsePassportBlock(lines));
@@ -206,9 +368,22 @@ function parseHorseRealityText(rawText) {
     }
   }
 
+  const colors = parseColourBlock(lines);
+  if (colors && colors.length) result.colors = colors;
+
+  const disciplinesBlock = parseDisciplinesBlock(lines);
+  if (disciplinesBlock) {
+    if (Object.keys(disciplinesBlock.disciplines).length) result.disciplines = disciplinesBlock.disciplines;
+    if (result.genetic_potential == null && disciplinesBlock.gpTotal != null) {
+      result.genetic_potential = disciplinesBlock.gpTotal;
+    }
+  }
+
+  const exterior = parseConformationDescriptiveBlock(lines);
+  if (exterior && Object.keys(exterior).length) result.exterior = exterior;
+
   return result;
 }
 
-// TODO sobald Beispieltext vorliegt: parseColourBlock (Farbgenetik-Tabelle
-// je Genort), parseStatsBlock (Exterieur/Interieur/Disziplinen),
-// parseFoalsBlock (Nachkommen-Liste mit hr_id/Name/Link je Fohlen).
+// TODO sobald Beispieltext vorliegt: parseFoalsBlock (Nachkommen-Liste mit
+// hr_id/Name/Link je Fohlen, aus dem Foals-Reiter).

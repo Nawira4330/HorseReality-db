@@ -59,6 +59,7 @@ create table if not exists public.horses (
   raw_text_foals text,
 
   notes text,
+  owner text,                    -- freier Text, z.B. falls Pferde eines Zuchtpartners mitgefuehrt werden
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

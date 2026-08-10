@@ -13,27 +13,38 @@
 
 const PEDIGREE_MAX_GENERATION = 18;
 
-const HORSE_LIGHT_COLUMNS = [
+const HORSE_LIGHT_COLUMNS_BASE = [
   'id', 'hr_id', 'name', 'link', 'image_url', 'gender', 'breed',
   'genetic_potential', 'conformation', 'tested_colours', 'coi',
   'sire_hr_id', 'sire_name', 'sire_link', 'dam_hr_id', 'dam_name', 'dam_link',
-  'pedigree_tree',
-].join(', ');
+  'pedigree_tree', 'pangare', 'sooty', 'flaxen', 'sabino',
+];
+const HORSE_LIGHT_COLUMNS = HORSE_LIGHT_COLUMNS_BASE.concat('owner').join(', ');
+const HORSE_LIGHT_COLUMNS_NO_OWNER = HORSE_LIGHT_COLUMNS_BASE.join(', ');
 
 const PAGE_SIZE = 1000;
 
 // Lädt alle Pferde mit den für Stammbaum-Berechnungen nötigen Spalten
 // (kein select('*'), um raw_text/pedigree_tree bei vielen Zeilen nicht
 // unnötig oft mitzuladen) - paginiert per .range(), falls die Tabelle die
-// PostgREST-Standardgrenze (1000 Zeilen) überschreitet.
+// PostgREST-Standardgrenze (1000 Zeilen) überschreitet. Fällt automatisch
+// auf eine Spaltenliste ohne "owner" zurück, falls migration_001_owner.sql
+// noch nicht ausgeführt wurde - sonst wäre ohne dieses Feld die gesamte
+// Stammbaum-/Inzucht-/Vergleichs-Funktionalität blockiert, nur weil eine
+// einzelne (optionale) Spalte fehlt.
 async function fetchAllHorsesLight() {
   const all = [];
   let from = 0;
+  let columns = HORSE_LIGHT_COLUMNS;
   for (;;) {
-    const { data, error } = await supabaseClient
+    let { data, error } = await supabaseClient
       .from('horses')
-      .select(HORSE_LIGHT_COLUMNS)
+      .select(columns)
       .range(from, from + PAGE_SIZE - 1);
+    if (error && columns === HORSE_LIGHT_COLUMNS && /column .*owner.* does not exist/i.test(error.message)) {
+      columns = HORSE_LIGHT_COLUMNS_NO_OWNER;
+      ({ data, error } = await supabaseClient.from('horses').select(columns).range(from, from + PAGE_SIZE - 1));
+    }
     if (error) throw new Error(`Supabase-Fehler beim Laden der Pferde: ${error.message}`);
     if (!data || data.length === 0) break;
     all.push(...data);
@@ -51,9 +62,16 @@ function buildHorsesByHrId(horses) {
 
 function resolveSubtree(hrId, name, link, path, generation, maxGeneration, horsesByHrId, seedByPath) {
   if (generation > maxGeneration) return [];
+  const seedNode = seedByPath.get(path);
   const node = {
     path, generation, side: path[path.length - 1],
     hr_id: hrId || null, name: name || null, link: link || null, image_url: null,
+    // Werte des Vorfahren selbst: bevorzugt aus einem eigenen (importierten)
+    // Datensatz, sonst best-effort aus dem beim Einfügen erkannten
+    // Stammbaum-Badge (siehe parser.js extractAncestorStats) - siehe unten,
+    // wo bei importierten Vorfahren die Live-Werte Vorrang bekommen.
+    genetic_potential: seedNode ? seedNode.genetic_potential : null,
+    conformation: seedNode ? seedNode.conformation : null,
   };
   if (!hrId || generation === maxGeneration) return [node];
 
@@ -64,6 +82,8 @@ function resolveSubtree(hrId, name, link, path, generation, maxGeneration, horse
     node.link = imported.link;
     node.image_url = imported.image_url;
     node.horse_id = imported.id; // interne DB-id, falls man dorthin verlinken will
+    node.genetic_potential = imported.genetic_potential;
+    node.conformation = imported.conformation;
     sireId = imported.sire_hr_id; sireName = imported.sire_name; sireLink = imported.sire_link;
     damId = imported.dam_hr_id; damName = imported.dam_name; damLink = imported.dam_link;
   } else {

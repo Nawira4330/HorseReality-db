@@ -44,10 +44,6 @@
             <input type="text" id="f-name" required />
           </div>
           <div class="field">
-            <label for="f-description">Beschreibung/Notiz-Titel</label>
-            <input type="text" id="f-description" placeholder="z.B. Flax c sw1 w21" />
-          </div>
-          <div class="field">
             <label for="f-gender">Geschlecht</label>
             <select id="f-gender">
               <option value="">–</option>
@@ -63,8 +59,8 @@
             <input type="text" id="f-breed" />
           </div>
           <div class="field">
-            <label for="f-age">Alter (Rohtext)</label>
-            <input type="text" id="f-age" placeholder="z.B. 12 years 11 months" />
+            <label for="f-owner">Besitzer</label>
+            <input type="text" id="f-owner" placeholder="z.B. Nawira" />
           </div>
           <div class="field">
             <label for="f-link">Link zur Pferdeseite</label>
@@ -91,10 +87,6 @@
           <div class="field">
             <label for="f-colours">Tested Colours</label>
             <input type="text" id="f-colours" placeholder="z.B. Ee AA gg SW1n W21n" />
-          </div>
-          <div class="field">
-            <label for="f-training">Training</label>
-            <input type="text" id="f-training" />
           </div>
           <div class="field">
             <label for="f-predicates">Predicates</label>
@@ -133,6 +125,21 @@
         <legend>Stammbaum (aus dem Info-Reiter erkannt)</legend>
         <p class="small muted" id="pedigree-summary"></p>
         <div id="pedigree-preview" class="small"></div>
+      </fieldset>
+
+      <fieldset id="colors-fieldset" hidden>
+        <legend>Farbgenetik (aus dem Colour-Reiter erkannt)</legend>
+        <p class="small muted" id="colors-preview"></p>
+      </fieldset>
+
+      <fieldset id="disciplines-fieldset" hidden>
+        <legend>Disziplin-Potenzialwerte (aus dem Colour-Reiter erkannt)</legend>
+        <p class="small muted" id="disciplines-preview"></p>
+      </fieldset>
+
+      <fieldset id="exterior-fieldset" hidden>
+        <legend>Exterieur/Gangarten-Bewertung (aus dem Stats-Reiter erkannt)</legend>
+        <p class="small muted" id="exterior-preview"></p>
       </fieldset>
 
       <fieldset>
