@@ -6,7 +6,7 @@ async function init() {
   const session = await requireSession();
   if (!session) return;
   wireLogout();
-  document.querySelector('#session-email').textContent = `Angemeldet als: ${session.user.email}`;
+  document.querySelector('#session-email').textContent = `Angemeldet als: ${displayIdentity(session.user.email)}`;
 
   const id = new URLSearchParams(location.search).get('id');
   if (!id) { location.href = 'index.html'; return; }

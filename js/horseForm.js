@@ -10,7 +10,7 @@ async function init() {
   const session = await requireSession();
   if (!session) return;
   wireLogout();
-  document.querySelector('#session-email').textContent = `Angemeldet als: ${session.user.email}`;
+  document.querySelector('#session-email').textContent = `Angemeldet als: ${displayIdentity(session.user.email)}`;
 
   document.querySelector('#parse-btn').addEventListener('click', onParse);
   document.querySelector('#horse-form').addEventListener('submit', onSave);

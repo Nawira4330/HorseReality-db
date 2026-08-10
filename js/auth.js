@@ -13,6 +13,13 @@ function resolveLoginEmail(identifier) {
   return identifier.includes('@') ? identifier : identifier + USERNAME_EMAIL_DOMAIN;
 }
 
+// Für die Anzeige ("Angemeldet als: ..."): bei einem Benutzername-Konto nur
+// den Benutzernamen zeigen (ohne die frei erfundene "@..."-Domain), bei
+// einem echten E-Mail-Konto die volle Adresse.
+function displayIdentity(email) {
+  return email.endsWith(USERNAME_EMAIL_DOMAIN) ? email.slice(0, -USERNAME_EMAIL_DOMAIN.length) : email;
+}
+
 async function requireSession() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
