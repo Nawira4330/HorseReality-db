@@ -126,15 +126,17 @@ function extractFromPasteHtml(html) {
     result.image_url = candidates[0].src;
   }
 
-  for (const a of doc.querySelectorAll('a[href]')) {
-    const raw = a.getAttribute('href');
-    let resolved;
-    try { resolved = new URL(raw, base).href; } catch { continue; }
-    if (OWN_LINK_RE.test(resolved.split('?')[0])) {
-      result.link = resolved;
-      break;
-    }
-  }
+  // Absichtlich KEINE automatische Link-Erkennung mehr über die Links im
+  // HTML-Fragment: der erste Treffer auf "/horses/<id>/" muss nicht der
+  // eigene Link sein, sondern kann z.B. aus dem Stammbaum-Bereich (ein
+  // Vorfahre) oder einer Listenansicht stammen. Das hat am 12.08.2026 dazu
+  // geführt, dass beim Massenerfassen mehrerer Fohlen hintereinander
+  // systematisch die Spiel-ID des JEWEILS VORHERIGEN Pferds übernommen
+  // wurde (Kollision mit dessen hr_id, dadurch versehentliches Überschreiben
+  // statt Neuanlage) - der Link muss deshalb weiterhin manuell eingetragen
+  // werden, oder über extractOwnLink (nur eine bewusst mitkopierte, für
+  // sich stehende Adresszeile, siehe oben - deutlich weniger mehrdeutig als
+  // "irgendein Link im HTML").
 
   return result;
 }
@@ -614,10 +616,39 @@ function buildDuplicateConfirmMessage(newName, existingName) {
     return `⚠️ ACHTUNG - ANDERER NAME GEFUNDEN! ⚠️\n\n`
       + `Du speicherst: "${newName}"\n`
       + `Gefunden (gleiche Spiel-ID): "${existingName}"\n\n`
-      + `Falls das NICHT dasselbe Pferd ist (z.B. nur im Spiel umbenannt), `
-      + `unbedingt ABBRECHEN wählen - sonst werden die Daten von `
-      + `"${existingName}" überschrieben!\n\n`
-      + `Wirklich zusammenführen?`;
+      + `Ist das wirklich dasselbe Pferd (z.B. nur im Spiel umbenannt)? `
+      + `Falls nicht, bitte "Als neues Pferd anlegen" wählen, statt zu `
+      + `ergänzen - sonst werden die Daten von "${existingName}" überschrieben!`;
   }
-  return `"${existingName}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`;
+  return `"${existingName}" ist bereits in der Datenbank.`;
+}
+
+// Zeigt die Ja/Neu/Abbrechen-Auswahl (Modal-Markup aus horse.html/
+// massenerfassung.html, #duplicate-modal) und liefert, welche Aktion
+// gewählt wurde:
+// - "merge": gefundenen Datensatz ergänzen/aktualisieren (mergePayloadWithExisting)
+// - "new": als eigenständiges NEUES Pferd anlegen, den Treffer ignorieren -
+//   wichtig, wenn eine falsch zugeordnete hr_id einen komplett anderen
+//   Datensatz gefunden hat (siehe Vorfall 12.08.2026)
+// - "cancel": gar nicht speichern
+function askDuplicateAction(newName, existingName) {
+  document.querySelector('#duplicate-modal-message').textContent = buildDuplicateConfirmMessage(newName, existingName);
+  document.querySelector('#duplicate-modal').hidden = false;
+  return new Promise((resolve) => {
+    const cancelBtn = document.querySelector('#duplicate-modal-cancel');
+    const newBtn = document.querySelector('#duplicate-modal-new');
+    const mergeBtn = document.querySelector('#duplicate-modal-merge');
+    const cleanup = () => {
+      document.querySelector('#duplicate-modal').hidden = true;
+      cancelBtn.removeEventListener('click', onCancel);
+      newBtn.removeEventListener('click', onNew);
+      mergeBtn.removeEventListener('click', onMerge);
+    };
+    const onCancel = () => { cleanup(); resolve('cancel'); };
+    const onNew = () => { cleanup(); resolve('new'); };
+    const onMerge = () => { cleanup(); resolve('merge'); };
+    cancelBtn.addEventListener('click', onCancel);
+    newBtn.addEventListener('click', onNew);
+    mergeBtn.addEventListener('click', onMerge);
+  });
 }

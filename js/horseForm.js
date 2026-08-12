@@ -253,14 +253,23 @@ async function onSave(e) {
       existing = data;
     }
     if (existing) {
-      const proceed = confirm(buildDuplicateConfirmMessage(payload.name, existing.name));
-      if (!proceed) {
+      const action = await askDuplicateAction(payload.name, existing.name);
+      if (action === 'cancel') {
         errorBox.textContent = 'Speichern abgebrochen.';
         return;
       }
-      updated = true;
-      const merged = mergePayloadWithExisting(payload, existing);
-      result = await supabaseClient.from('horses').update(merged).eq('id', existing.id).select().maybeSingle();
+      if (action === 'new') {
+        // Treffer bewusst ignoriert (z.B. falsch zugeordnete hr_id) - ohne
+        // hr_id/Link anlegen, sonst schlägt das Speichern am eindeutigen
+        // hr_id-Index fehl (der gefundene Datensatz behält seine eigene).
+        payload.hr_id = null;
+        payload.link = null;
+        result = await supabaseClient.from('horses').insert(payload).select().maybeSingle();
+      } else {
+        updated = true;
+        const merged = mergePayloadWithExisting(payload, existing);
+        result = await supabaseClient.from('horses').update(merged).eq('id', existing.id).select().maybeSingle();
+      }
     } else {
       result = await supabaseClient.from('horses').insert(payload).select().maybeSingle();
     }

@@ -185,6 +185,18 @@
         <a class="btn secondary session-finish-btn" href="index.html">Fertig / Zur Übersicht</a>
       </aside>
     </div>
+
+    <div class="modal-overlay" id="duplicate-modal" hidden>
+      <div class="modal-box">
+        <h2>Pferd bereits vorhanden?</h2>
+        <p id="duplicate-modal-message" style="white-space: pre-line;"></p>
+        <div class="modal-actions">
+          <button type="button" class="secondary" id="duplicate-modal-cancel">Abbrechen</button>
+          <button type="button" class="secondary" id="duplicate-modal-new">Als neues Pferd anlegen</button>
+          <button type="button" id="duplicate-modal-merge">Ergänzen</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="js/config.js"></script>
