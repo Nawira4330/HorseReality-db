@@ -65,6 +65,65 @@ function extractImageUrl(rawText) {
   return bareMatch ? bareMatch[0] : null;
 }
 
+// Der Link zur eigenen Pferdeseite steht NIE im kopierten Reiter-Text (der
+// eigene Name ist dort kein Hyperlink, anders als bei Vorfahren) - wird nur
+// gefunden, wenn zusätzlich die Adresszeile mit in die Box eingefügt wurde
+// (eine eigene Zeile, die nur aus der reinen horsereality.com/horses/ID-URL
+// besteht - im Unterschied zu Vorfahren-Links steht hier kein Name davor).
+const OWN_LINK_RE = /^https?:\/\/(?:www\.|v2\.)?horsereality\.com\/horses\/\d+\/?(?:\?.*)?$/i;
+function extractOwnLink(lines) {
+  const line = lines.find((l) => OWN_LINK_RE.test(l));
+  return line || null;
+}
+
+// Kopiert man direkt aus dem Spiel (z.B. Strg+A/Strg+C auf der ganzen
+// Seite statt nur eines Textabschnitts), legt der Browser neben dem reinen
+// Text zusätzlich eine HTML-Fassung der Auswahl in die Zwischenablage
+// ("text/html") ab - darin sind, anders als im reinen Text, auch Bilder
+// (<img src=...>) und ggf. echte Links enthalten (der Link zur eigenen
+// Pferdeseite taucht im sichtbaren Text nirgends als Link auf, siehe
+// extractOwnLink oben - in der HTML-Struktur der Seite unter Umständen
+// trotzdem, z.B. als "Teilen"-Link oder Canonical-Verweis). Best-Effort-
+// Heuristik, da die genaue HTML-Struktur der Spielseite nicht bekannt ist
+// (anders als beim Schwesterprojekt MDR-Datenbank, das eine bekannte
+// Bild-ID nutzt): das größte eingebundene Bild wird als Pferdebild
+// angenommen. Relative Pfade werden gegen die Spiel-Domain aufgelöst -
+// DOMParser würde sie sonst fälschlich gegen die aktuelle Seite (also diese
+// Datenbank-App) auflösen.
+function extractFromPasteHtml(html) {
+  const result = {};
+  if (!html || typeof DOMParser === 'undefined') return result;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const base = 'https://www.horsereality.com/';
+
+  const images = [...doc.querySelectorAll('img[src]')]
+    .map((img) => {
+      const raw = img.getAttribute('src');
+      let resolved;
+      try { resolved = new URL(raw, base).href; } catch { return null; }
+      const w = parseInt(img.getAttribute('width'), 10) || 0;
+      const h = parseInt(img.getAttribute('height'), 10) || 0;
+      return { src: resolved, area: w * h };
+    })
+    .filter((i) => i && /^https?:\/\//.test(i.src));
+  if (images.length) {
+    images.sort((a, b) => b.area - a.area);
+    result.image_url = images[0].src;
+  }
+
+  for (const a of doc.querySelectorAll('a[href]')) {
+    const raw = a.getAttribute('href');
+    let resolved;
+    try { resolved = new URL(raw, base).href; } catch { continue; }
+    if (OWN_LINK_RE.test(resolved.split('?')[0])) {
+      result.link = resolved;
+      break;
+    }
+  }
+
+  return result;
+}
+
 function findLineIndex(lines, predicate, from = 0) {
   for (let i = from; i < lines.length; i++) {
     if (predicate(lines[i])) return i;
@@ -97,17 +156,29 @@ function parseHeaderBlock(lines) {
   if (!lines[0]) return result;
   result.name = lines[0];
   const genderRe = /^(Stallion|Mare|Gelding|Colt|Filly)$/i;
-  if (lines[1] && !genderRe.test(lines[1]) && !BADGE_WORDS.has(lines[1])) {
-    result.description = lines[1];
+
+  // Manche Kopiermethoden fügen zwischen jedem Feld eine eigene Leerzeile
+  // ein (z.B. beim Kopieren der ganzen Seite statt nur des Passport-
+  // Widgets) - für die Kopfzeilen-Erkennung werden diese Leerzeilen
+  // ignoriert, damit die Positionslogik unabhängig vom Zeilenabstand
+  // funktioniert.
+  const content = [];
+  for (let i = 1; i < lines.length && content.length < 10; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (line === '* Care' || line.startsWith('* ')) break; // Reiter-Navigation erreicht
+    content.push(line);
+  }
+
+  if (content[0] && !genderRe.test(content[0]) && !BADGE_WORDS.has(content[0]) && !LINK_LINE_RE.test(content[0])) {
+    result.description = content[0];
   }
   const ageRe = /\d+\s*(years?|months?)/i;
 
-  for (let i = 1; i < Math.min(lines.length, 12); i++) {
-    const line = lines[i];
-    if (!line || BADGE_WORDS.has(line) || LINK_LINE_RE.test(line)) continue;
+  for (const line of content) {
+    if (BADGE_WORDS.has(line) || LINK_LINE_RE.test(line)) continue;
     if (genderRe.test(line)) result.gender = line;
     else if (ageRe.test(line)) result.age_text = line;
-    else if (line === '* Care' || line.startsWith('* ')) break; // Reiter-Navigation erreicht
     else if (!result.breed && line !== result.description) result.breed = line;
   }
   return result;
@@ -164,6 +235,34 @@ function parseColourBlock(lines) {
   while (i < end) {
     const line = lines[i];
     if (!line) { i++; continue; }
+
+    // Manche Kopiermethoden stellen jedem Genort zusätzlich eine eigene
+    // "Tested"-Zeile voran (Label/technischer Name/Genotyp rücken dadurch
+    // um eine Zeile weiter nach hinten). Genorte ohne Genotyp-Zeile danach
+    // sind schlicht nicht getestet (z.B. Tobiano/Roan/W8, wenn nur SW1/W21
+    // vom selben Gen-Cluster einen Wert zeigen) - werden übersprungen, ohne
+    // die aktuelle Gruppen-Überschrift zu verändern.
+    if (line === 'Tested') {
+      const label = lines[i + 1];
+      const technical = lines[i + 2];
+      const genotype = lines[i + 3];
+      if (i + 3 < end && label && technical && genotype && GENOTYPE_PAIR_RE.test(genotype)) {
+        const m = genotype.match(GENOTYPE_PAIR_RE);
+        loci.push({
+          category: currentCategory,
+          label,
+          technical_name: technical,
+          genotype,
+          allele1: m[1],
+          allele2: m[2],
+        });
+        i += 4;
+        continue;
+      }
+      i += label ? 2 : 1;
+      continue;
+    }
+
     const next1 = lines[i + 1];
     const next2 = lines[i + 2];
     if (i + 2 < end && next1 && next2 && GENOTYPE_PAIR_RE.test(next2)) {
@@ -314,7 +413,18 @@ function parsePedigreeBlock(lines) {
       entries.push(null);
       i++;
     } else {
-      i++; // unbekanntes Zwischenformat - überspringen statt abzubrechen
+      // Manche Kopiermethoden liefern den Stammbaum ohne Markdown-Links
+      // (reiner Name statt "[Name](url)") - dann lässt sich hr_id/Link
+      // nicht ermitteln, der Name selbst aber schon. Nur das bekannte
+      // "Foundation Breeder"-Abzeichen wird als Zusatzzeile übersprungen,
+      // da sich ohne Link-basierte Abgrenzung nicht zuverlässig erkennen
+      // lässt, wie viele Zusatzzeilen (Werte-Badge, Stallname) zu einem
+      // regulär gezüchteten Vorfahren gehören - dafür bleibt weiterhin ein
+      // Link-Paste nötig.
+      let next = i + 1;
+      if (BADGE_WORDS.has(lines[next])) next++;
+      entries.push({ name: line, link: null, hr_id: null });
+      i = next;
     }
   }
 
@@ -339,13 +449,72 @@ function parsePedigreeBlock(lines) {
   return { coi, tree };
 }
 
+// Manche Kopiermethoden liefern Navigations-/Menüpunkte als "* Text" statt
+// als eigene Zeile, andere als Markdown-Link "* [Text](url)" oder
+// "[Text](url)" - für Vergleiche mit bekannten Fixtexten (z.B. "Go To
+// City", "Contact") wird das auf den reinen Text reduziert.
+function plainLineText(line) {
+  if (!line) return line;
+  const noBullet = line.startsWith('* ') ? line.slice(2) : line;
+  const m = noBullet.match(LINK_LINE_RE);
+  return m ? m[1] : noBullet;
+}
+
+// Wird beim Kopieren der GANZEN Seite (statt nur des sichtbaren
+// Reiter-Inhalts) vor jedem Abschnitt mitkopiert: linke Navigationsleiste
+// ("Horse Reality" / "HR Time: ..." / Kontostand / Menü ... bis "Go To
+// City", je nach Kopiermethode einmal oder zweimal hintereinander) und
+// Seiten-Footer ("Studio Deloryan" ... bis "Contact"). Beides ist bei jedem
+// Aufruf identisch und wiederholt sich pro eingefügtem Abschnitt - wird
+// herausgefiltert, damit z.B. nicht "Horse Reality"/"HR Time: ..." statt
+// des tatsächlichen Pferdenamens als erste Zeile erkannt wird.
+function stripSiteChrome(lines) {
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i] === 'Horse Reality' || /^HR Time:/.test(lines[i])) {
+      let j = i;
+      let sawGoToCity = false;
+      let end = -1;
+      while (j < lines.length && j < i + 250) {
+        if (plainLineText(lines[j]) === 'Go To City') {
+          sawGoToCity = true;
+          end = j;
+        } else if (sawGoToCity && lines[j]) {
+          break; // erste inhaltliche Zeile nach der Navigationsleiste erreicht
+        }
+        j++;
+      }
+      if (sawGoToCity) {
+        i = end + 1;
+        continue;
+      }
+    }
+    if (lines[i] === 'Studio Deloryan') {
+      let j = i + 1;
+      while (j < lines.length && plainLineText(lines[j]) !== 'Contact') j++;
+      i = j + 1;
+      continue;
+    }
+    out.push(lines[i]);
+    i++;
+  }
+  return out;
+}
+
 function parseHorseRealityText(rawText) {
-  const lines = rawText.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim());
+  const lines = stripSiteChrome(rawText.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()));
+  // parseHeaderBlock erwartet den Pferdenamen in lines[0] - nach dem
+  // Entfernen der Navigationsleiste kann davor noch eine Leerzeile stehen.
+  while (lines.length && !lines[0]) lines.shift();
 
   const result = { raw_text_info: rawText };
 
   const imageUrl = extractImageUrl(rawText);
   if (imageUrl) result.image_url = imageUrl;
+
+  const ownLink = extractOwnLink(lines);
+  if (ownLink) result.link = ownLink;
 
   Object.assign(result, parseHeaderBlock(lines));
   Object.assign(result, parsePassportBlock(lines));

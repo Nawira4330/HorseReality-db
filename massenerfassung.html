@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Massenerfassung – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="massen-intro">
+      <h2>Massenerfassung</h2>
+      <p class="muted small">
+        Für viele Pferde hintereinander: Text einfügen (wird automatisch ausgelesen, kein Klick nötig),
+        kurz prüfen, "Speichern &amp; nächstes Pferd" – die Box leert sich danach automatisch und ist
+        sofort bereit fürs nächste Pferd. Besitzer und Rasse bleiben zwischen Pferden erhalten (meist
+        gleich bei mehreren Pferden hintereinander), alles andere wird geleert.
+      </p>
+    </div>
+
+    <div class="massen-layout">
+      <div class="massen-main">
+        <details class="paste-box" id="paste-box" open>
+          <summary>Text von der Pferdeseite einfügen</summary>
+          <p class="small muted">
+            Horse Reality zeigt die Pferdedaten auf mehreren Reitern (Care/Info/Colour/Stats/Foals).
+            Öffne nacheinander die Reiter, markiere den Inhalt (Strg+A), kopiere (Strg+C) und füge
+            alles hier in dieselbe Box ein (mehrfach hintereinander ist ok) - wird beim Einfügen
+            automatisch ausgelesen. Bild und Link werden dabei nach Möglichkeit direkt mit erkannt.
+            Klappt das nicht: für das Bild reicht Rechtsklick auf das Pferdebild im Spiel →
+            "Bild kopieren", dann Strg+V direkt ins Bild-URL-Feld unten; für den Link hilft es, die
+            Adresszeile (die URL der Pferdeseite) mit in die Box einzufügen.
+          </p>
+          <textarea id="paste-text" placeholder="Text von Info-/Colour-/Stats-/Foals-Reiter hier einfügen..." autofocus></textarea>
+          <div class="paste-actions">
+            <button type="button" id="parse-btn">Automatisch auslesen</button>
+            <span id="parse-status" class="muted small"></span>
+          </div>
+        </details>
+
+        <form id="horse-form">
+          <fieldset>
+            <legend>Stammdaten</legend>
+            <div class="form-grid">
+              <div class="field">
+                <label for="f-name">Name *</label>
+                <input type="text" id="f-name" required />
+              </div>
+              <div class="field">
+                <label for="f-gender">Geschlecht</label>
+                <select id="f-gender">
+                  <option value="">–</option>
+                  <option>Stallion</option>
+                  <option>Mare</option>
+                  <option>Gelding</option>
+                  <option>Colt</option>
+                  <option>Filly</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-breed">Rasse</label>
+                <input type="text" id="f-breed" />
+              </div>
+              <div class="field">
+                <label for="f-owner">Besitzer</label>
+                <input type="text" id="f-owner" placeholder="z.B. Nawira" />
+              </div>
+              <div class="field">
+                <label for="f-link">Link zur Pferdeseite</label>
+                <input type="url" id="f-link" placeholder="https://www.horsereality.com/horses/.../" />
+              </div>
+              <div class="field">
+                <label for="f-image">Bild-URL</label>
+                <input type="url" id="f-image" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Passport</legend>
+            <div class="form-grid">
+              <div class="field">
+                <label for="f-gp">Genetic Potential (GP)</label>
+                <input type="number" id="f-gp" step="0.01" />
+              </div>
+              <div class="field">
+                <label for="f-conformation">Conformation</label>
+                <input type="text" id="f-conformation" placeholder="z.B. 1VG 12G 1A" />
+              </div>
+              <div class="field">
+                <label for="f-colours">Tested Colours</label>
+                <input type="text" id="f-colours" placeholder="z.B. Ee AA gg SW1n W21n" />
+              </div>
+              <div class="field">
+                <label for="f-predicates">Predicates</label>
+                <input type="text" id="f-predicates" />
+              </div>
+              <div class="field">
+                <label for="f-coi">COI (%)</label>
+                <input type="number" id="f-coi" step="0.01" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Optische Merkmale (nur im Bild sichtbar, noch nicht automatisch erkannt)</legend>
+            <div class="form-grid">
+              <div class="field">
+                <label for="f-pangare">Pangaré</label>
+                <select id="f-pangare"><option value="">unbekannt</option><option value="ja">ja</option><option value="nein">nein</option></select>
+              </div>
+              <div class="field">
+                <label for="f-sooty">Sooty</label>
+                <select id="f-sooty"><option value="">unbekannt</option><option value="ja">ja</option><option value="nein">nein</option></select>
+              </div>
+              <div class="field">
+                <label for="f-flaxen">Flaxen</label>
+                <select id="f-flaxen"><option value="">unbekannt</option><option value="ja">ja</option><option value="nein">nein</option></select>
+              </div>
+              <div class="field">
+                <label for="f-sabino">Sabino</label>
+                <select id="f-sabino"><option value="">unbekannt</option><option value="ja">ja</option><option value="nein">nein</option></select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset id="pedigree-fieldset" hidden>
+            <legend>Stammbaum (aus dem Info-Reiter erkannt)</legend>
+            <p class="small muted" id="pedigree-summary"></p>
+            <div id="pedigree-preview" class="small"></div>
+          </fieldset>
+
+          <fieldset id="colors-fieldset" hidden>
+            <legend>Farbgenetik (aus dem Colour-Reiter erkannt)</legend>
+            <div id="colors-preview" class="chip-grid"></div>
+          </fieldset>
+
+          <fieldset id="disciplines-fieldset" hidden>
+            <legend>Disziplin-Potenzialwerte (aus dem Colour-Reiter erkannt)</legend>
+            <div id="disciplines-preview" class="chip-grid"></div>
+          </fieldset>
+
+          <fieldset id="exterior-fieldset" hidden>
+            <legend>Exterieur/Gangarten-Bewertung (aus dem Stats-Reiter erkannt)</legend>
+            <div id="exterior-preview" class="chip-grid"></div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Sonstiges</legend>
+            <label for="f-notes">Notizen</label>
+            <textarea id="f-notes" rows="2"></textarea>
+          </fieldset>
+
+          <p id="form-error" class="error"></p>
+
+          <div class="form-actions">
+            <button type="submit">💾 Speichern &amp; nächstes Pferd</button>
+            <button type="button" class="secondary" id="clear-btn">Formular leeren</button>
+          </div>
+        </form>
+      </div>
+
+      <aside class="session-panel">
+        <div class="session-count-card">
+          <span class="session-count-number" id="session-count">0</span>
+          <span class="session-count-label">in dieser Sitzung erfasst</span>
+        </div>
+        <div id="session-list" class="session-list"></div>
+        <a class="btn secondary session-finish-btn" href="index.html">Fertig / Zur Übersicht</a>
+      </aside>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/massenerfassung.js"></script>
+</body>
+</html>

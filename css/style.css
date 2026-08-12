@@ -17,6 +17,7 @@
   --danger: #c84149;
   --success: #2f7a74;
   --warning: #d98a3d;
+  --warning-rgb: 217, 138, 61;
   --header-bg: #14232c;
   --header-text: #f3f6f7;
   --radius: 8px;
@@ -40,6 +41,7 @@
     --danger: #e0827f;
     --success: #4fa89f;
     --warning: #e0a860;
+    --warning-rgb: 224, 168, 96;
     --header-bg: #0e181f;
     --header-text: #e6eef0;
     --th-bg-solid: #223339;
@@ -471,6 +473,97 @@ details.paste-box:not([open]) > summary { margin-bottom: 0; }
   .form-actions button, .form-actions .btn { width: 100%; text-align: center; }
   fieldset { padding: 0.7rem 0.8rem 0.9rem; }
   details.paste-box { padding: 0.7rem 0.8rem 0.9rem; }
+}
+
+/* --- Massenerfassung: zweispaltiges Layout mit Sitzungs-Fortschritt --- */
+.massen-intro { margin-bottom: 1rem; }
+.massen-intro h2 { margin-bottom: 0.3rem; }
+
+.massen-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.25rem;
+  align-items: start;
+}
+.massen-main { min-width: 0; }
+
+.session-panel {
+  position: sticky;
+  top: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+.session-count-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.3rem 0 0.9rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+.session-count-number {
+  font-family: var(--font-heading);
+  font-size: 2.6rem;
+  font-weight: 400;
+  color: var(--accent);
+  line-height: 1;
+}
+.session-count-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.35rem;
+}
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: calc(100vh / var(--zoom) - 22rem);
+  overflow-y: auto;
+}
+.session-list:empty::before {
+  content: "Noch keine Pferde in dieser Sitzung.";
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(var(--accent-rgb), 0.07);
+  font-size: 0.85rem;
+}
+.session-item.updated { background: rgba(var(--warning-rgb), 0.12); }
+.session-item .session-item-note { color: var(--muted); font-size: 0.78rem; }
+.session-finish-btn { display: block; width: 100%; text-align: center; margin-top: 0.9rem; }
+
+/* --- Chip-Vorschau (Farbgenetik/Disziplinen/Exterieur) --- */
+.chip-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(var(--accent-rgb), 0.05);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.chip-label { color: var(--muted); }
+.chip-value { font-weight: 600; }
+
+@media (max-width: 900px) {
+  .massen-layout { grid-template-columns: 1fr; }
+  .session-panel { position: static; }
+  .session-list { max-height: 40vh; }
 }
 
 @media (min-width: 641px) {

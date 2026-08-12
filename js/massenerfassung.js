@@ -1,8 +1,8 @@
-let editingId = null;
 let currentPedigreeTree = null;
 let currentColors = null;
 let currentDisciplines = null;
 let currentExterior = null;
+let sessionEntries = []; // {id, name} je in dieser Sitzung gespeichertem Pferd
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -13,34 +13,15 @@ async function init() {
   document.querySelector('#session-email').textContent = `Angemeldet als: ${displayIdentity(session.user.email)}`;
 
   document.querySelector('#parse-btn').addEventListener('click', onParse);
-  document.querySelector('#horse-form').addEventListener('submit', onSave);
-  document.querySelector('#delete-btn').addEventListener('click', onDelete);
+  document.querySelector('#horse-form').addEventListener('submit', onSaveAndNext);
+  document.querySelector('#clear-btn').addEventListener('click', () => clearForm(false));
   document.querySelector('#f-image').addEventListener('paste', onImagePaste);
+  // Automatisch auslesen, sobald etwas in die Box eingefügt wird - kein
+  // Extra-Klick nötig, damit viele Pferde schnell hintereinander gehen.
+  document.querySelector('#paste-text').addEventListener('paste', () => setTimeout(onParse, 0));
   document.querySelector('#paste-text').addEventListener('paste', onPasteTextHtml);
 
-  const params = new URLSearchParams(location.search);
-  editingId = params.get('id');
-  if (editingId) {
-    document.querySelector('#form-title').textContent = 'Pferd bearbeiten';
-    document.querySelector('#delete-btn').hidden = false;
-    document.querySelector('#paste-box').open = false;
-    await loadExisting(editingId);
-  }
-}
-
-async function loadExisting(id) {
-  const { data, error } = await supabaseClient.from('horses').select('*').eq('id', id).maybeSingle();
-  if (error || !data) {
-    alert('Pferd konnte nicht geladen werden: ' + (error?.message || 'nicht gefunden'));
-    location.href = 'index.html';
-    return;
-  }
-  // Bereits gespeicherte strukturierte Daten vormerken, damit ein erneutes
-  // Speichern (ohne erneutes Einfügen) sie nicht verliert.
-  if (data.colors) currentColors = data.colors;
-  if (data.disciplines) currentDisciplines = data.disciplines;
-  if (data.exterior) currentExterior = data.exterior;
-  fillForm(data);
+  document.querySelector('#f-name').focus();
 }
 
 // Erlaubt das Einfügen eines direkt kopierten Bilds (z.B. per Rechtsklick
@@ -88,16 +69,15 @@ function onParse() {
   if (!raw.trim()) return;
   const parsed = parseHorseRealityText(raw);
   fillForm(parsed);
+  const status = document.querySelector('#parse-status');
+  status.textContent = `Ausgelesen: ${parsed.name || 'kein Name erkannt'}`;
+  setTimeout(() => { if (status.textContent.startsWith('Ausgelesen')) status.textContent = ''; }, 4000);
 }
 
-// Befüllt nur Felder, für die parsed tatsächlich einen Wert liefert -
-// bereits vorhandene Werte im Formular bleiben erhalten, wenn ein erneutes
-// Einfügen (z.B. nur der Colour-Reiter) diese Felder nicht enthält.
 function fillForm(parsed) {
   setIf('#f-name', parsed.name);
   setIf('#f-gender', parsed.gender);
   setIf('#f-breed', parsed.breed);
-  setIf('#f-owner', parsed.owner);
   setIf('#f-link', parsed.link);
   setIf('#f-image', parsed.image_url);
   setIf('#f-gp', parsed.genetic_potential);
@@ -117,24 +97,26 @@ function fillForm(parsed) {
   }
   if (parsed.colors && parsed.colors.length) {
     currentColors = parsed.colors;
-    renderStructuredPreview('#colors-preview', '#colors-fieldset',
-      parsed.colors.map((c) => `${c.label} (${c.technical_name}): ${c.genotype}`).join(' · '));
+    renderChipPreview('#colors-preview', '#colors-fieldset',
+      parsed.colors.map((c) => ({ label: `${c.label} (${c.technical_name})`, value: c.genotype })));
   }
   if (parsed.disciplines) {
     currentDisciplines = parsed.disciplines;
-    renderStructuredPreview('#disciplines-preview', '#disciplines-fieldset',
-      Object.entries(parsed.disciplines).map(([k, v]) => `${k}: ${v}`).join(' · '));
+    renderChipPreview('#disciplines-preview', '#disciplines-fieldset',
+      Object.entries(parsed.disciplines).map(([k, v]) => ({ label: k, value: v })));
   }
   if (parsed.exterior) {
     currentExterior = parsed.exterior;
-    renderStructuredPreview('#exterior-preview', '#exterior-fieldset',
-      Object.entries(parsed.exterior).map(([k, v]) => `${k}: ${v}`).join(' · '));
+    renderChipPreview('#exterior-preview', '#exterior-fieldset',
+      Object.entries(parsed.exterior).map(([k, v]) => ({ label: k, value: v })));
   }
 }
 
-function renderStructuredPreview(previewSelector, fieldsetSelector, text) {
+function renderChipPreview(previewSelector, fieldsetSelector, items) {
   document.querySelector(fieldsetSelector).hidden = false;
-  document.querySelector(previewSelector).textContent = text;
+  document.querySelector(previewSelector).innerHTML = items.map((it) => `
+    <span class="chip"><span class="chip-label">${escapeHtml(it.label)}</span><span class="chip-value">${escapeHtml(String(it.value))}</span></span>
+  `).join('');
 }
 
 function setIf(selector, value) {
@@ -210,14 +192,11 @@ function buildPayload() {
   if (currentColors) payload.colors = currentColors;
   if (currentDisciplines) payload.disciplines = currentDisciplines;
   if (currentExterior) payload.exterior = currentExterior;
-  // "owner" nur mitschicken, wenn tatsächlich ausgefüllt - so bricht das
-  // Speichern nicht, solange migration_001_owner.sql noch nicht ausgeführt
-  // wurde (die Spalte existiert dann noch nicht in der Datenbank).
   if (owner) payload.owner = owner;
   return payload;
 }
 
-async function onSave(e) {
+async function onSaveAndNext(e) {
   e.preventDefault();
   const errorBox = document.querySelector('#form-error');
   errorBox.textContent = '';
@@ -228,25 +207,22 @@ async function onSave(e) {
     return;
   }
 
+  // Gleiche hr_id oder gleicher Name -> bestehendes Pferd aktualisieren statt doppelt anzulegen.
+  let existing = null;
+  if (payload.hr_id) {
+    const { data } = await supabaseClient.from('horses').select('id').eq('hr_id', payload.hr_id).maybeSingle();
+    existing = data;
+  }
+  if (!existing) {
+    const { data } = await supabaseClient.from('horses').select('id').ilike('name', payload.name).maybeSingle();
+    existing = data;
+  }
+
   let result;
-  if (editingId) {
-    result = await supabaseClient.from('horses').update(payload).eq('id', editingId).select().maybeSingle();
+  if (existing) {
+    result = await supabaseClient.from('horses').update(payload).eq('id', existing.id).select('id,name').maybeSingle();
   } else {
-    // Gleiche hr_id oder gleicher Name -> bestehendes Pferd aktualisieren statt doppelt anzulegen.
-    let existing = null;
-    if (payload.hr_id) {
-      const { data } = await supabaseClient.from('horses').select('id').eq('hr_id', payload.hr_id).maybeSingle();
-      existing = data;
-    }
-    if (!existing) {
-      const { data } = await supabaseClient.from('horses').select('id').ilike('name', payload.name).maybeSingle();
-      existing = data;
-    }
-    if (existing) {
-      result = await supabaseClient.from('horses').update(payload).eq('id', existing.id).select().maybeSingle();
-    } else {
-      result = await supabaseClient.from('horses').insert(payload).select().maybeSingle();
-    }
+    result = await supabaseClient.from('horses').insert(payload).select('id,name').maybeSingle();
   }
 
   if (result.error) {
@@ -254,19 +230,48 @@ async function onSave(e) {
     return;
   }
 
-  sessionStorage.setItem('flashMessage', `"${payload.name}" wurde ${editingId ? 'aktualisiert' : 'neu angelegt'}.`);
-  location.href = 'index.html';
+  sessionEntries.unshift({ id: result.data.id, name: result.data.name, updated: !!existing });
+  renderSessionList();
+  clearForm(true);
 }
 
-async function onDelete() {
-  if (!editingId) return;
-  if (!confirm('Dieses Pferd wirklich endgültig löschen?')) return;
-  const { error } = await supabaseClient.from('horses').delete().eq('id', editingId);
-  if (error) {
-    alert('Fehler beim Löschen: ' + error.message);
-    return;
+function renderSessionList() {
+  document.querySelector('#session-count').textContent = sessionEntries.length;
+  document.querySelector('#session-list').innerHTML = sessionEntries.map((e) => `
+    <div class="session-item${e.updated ? ' updated' : ''}">
+      <span>${e.updated ? '🔄' : '✅'}</span>
+      <a href="view.html?id=${e.id}" target="_blank">${escapeHtml(e.name)}</a>
+      ${e.updated ? '<span class="session-item-note">aktualisiert</span>' : ''}
+    </div>
+  `).join('');
+}
+
+// Leert das Formular für das nächste Pferd. Besitzer und Rasse bleiben
+// erhalten (bei "Speichern & nächstes" fast immer gleich, z.B. wenn man
+// einen ganzen Stall derselben Rasse hintereinander einträgt) - beim
+// bewussten "Formular leeren" (keepOwnerBreed=false) werden auch die geleert.
+function clearForm(keepOwnerBreed) {
+  const owner = document.querySelector('#f-owner').value;
+  const breed = document.querySelector('#f-breed').value;
+
+  document.querySelector('#horse-form').reset();
+  document.querySelector('#paste-text').value = '';
+  document.querySelector('#form-error').textContent = '';
+  document.querySelector('#parse-status').textContent = '';
+  currentPedigreeTree = null;
+  currentColors = null;
+  currentDisciplines = null;
+  currentExterior = null;
+  ['#pedigree-fieldset', '#colors-fieldset', '#disciplines-fieldset', '#exterior-fieldset'].forEach((sel) => {
+    document.querySelector(sel).hidden = true;
+  });
+
+  if (keepOwnerBreed) {
+    document.querySelector('#f-owner').value = owner;
+    document.querySelector('#f-breed').value = breed;
   }
-  location.href = 'index.html';
+
+  document.querySelector('#paste-text').focus();
 }
 
 function escapeHtml(str) {
