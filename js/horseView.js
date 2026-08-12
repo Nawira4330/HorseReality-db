@@ -51,6 +51,7 @@ function render(h) {
   }
 
   document.querySelector('#v-name').textContent = h.name;
+  document.querySelector('#v-tags').innerHTML = tagsBadgesHtml(h.tags);
 
   if (h.image_url) {
     const img = document.querySelector('#v-image');

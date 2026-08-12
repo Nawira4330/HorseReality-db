@@ -571,3 +571,30 @@ function parseHorseRealityText(rawText) {
 
 // TODO sobald Beispieltext vorliegt: parseFoalsBlock (Nachkommen-Liste mit
 // hr_id/Name/Link je Fohlen, aus dem Foals-Reiter).
+
+// Wird beim Speichern gebraucht, wenn sich herausstellt, dass ein Pferd mit
+// gleicher hr_id/gleichem Namen bereits existiert (siehe horseForm.js/
+// massenerfassung.js): ein frischer Paste enthält oft nur einen Teil der
+// Reiter (z.B. nur nochmal Colour, ohne Passport/Stammbaum) - ohne Merge
+// würde ein stumpfes UPDATE die beim ersten Mal erfassten Werte der
+// fehlenden Felder überschreiben/löschen. Ein leerer/nicht angegebener Wert
+// im neuen Payload wird deshalb durch den bereits gespeicherten Wert
+// ergänzt, ein tatsächlich angegebener neuer Wert überschreibt wie gewohnt
+// (gleiches Prinzip wie mergePayloadFromExisting im Schwesterprojekt
+// MDR-Datenbank).
+function isEmptyPayloadValue(value) {
+  if (value == null || value === '') return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+function mergePayloadWithExisting(payload, existing) {
+  const merged = { ...payload };
+  for (const key of Object.keys(existing)) {
+    if (key === 'id' || key === 'created_at') continue;
+    if (isEmptyPayloadValue(merged[key]) && !isEmptyPayloadValue(existing[key])) {
+      merged[key] = existing[key];
+    }
+  }
+  return merged;
+}

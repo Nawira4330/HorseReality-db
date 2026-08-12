@@ -13,6 +13,7 @@ async function init() {
   document.querySelector('#f-focus').addEventListener('change', render);
   document.querySelector('#f-breed').addEventListener('change', render);
   document.querySelector('#f-owner').addEventListener('change', render);
+  document.querySelector('#f-tag').addEventListener('change', render);
   document.querySelector('#f-color').addEventListener('input', render);
   document.querySelectorAll('#score-table th[data-sort]').forEach((th) => {
     th.addEventListener('click', () => {
@@ -29,6 +30,7 @@ async function init() {
   scoredHorses = computeScores(allHorses);
   populateBreedFilter();
   populateOwnerFilter();
+  populateTagFilter();
   render();
 }
 
@@ -88,6 +90,16 @@ function populateOwnerFilter() {
     const opt = document.createElement('option');
     opt.value = o;
     opt.textContent = o;
+    select.appendChild(opt);
+  });
+}
+
+function populateTagFilter() {
+  const select = document.querySelector('#f-tag');
+  HORSE_TAG_OPTIONS.forEach(({ label }) => {
+    const opt = document.createElement('option');
+    opt.value = label;
+    opt.textContent = label;
     select.appendChild(opt);
   });
 }
@@ -182,6 +194,7 @@ function computeScores(horses) {
       colorRarity: rarityFn(h),
       relatedness: relatednessFn(h),
       offspringCount: findOffspring(h, horses).length,
+      halfSiblingCount: findHalfSiblings(h, horses).length,
       specialTraitLoss,
       specialTraitLossRatio: specialTraitLoss ? specialTraitLoss.lossRatio * 100 : null,
     };
@@ -236,10 +249,12 @@ function totalScore(h, focus, ranges) {
 function getFiltered() {
   const breed = document.querySelector('#f-breed').value;
   const owner = document.querySelector('#f-owner').value;
+  const tag = document.querySelector('#f-tag').value;
   const colorSearch = document.querySelector('#f-color').value.trim().toLowerCase();
   return scoredHorses.filter((h) => {
     if (breed && h.breed !== breed) return false;
     if (owner && h.owner !== owner) return false;
+    if (tag && !(h.tags || []).includes(tag)) return false;
     if (colorSearch && !(h.tested_colours || '').toLowerCase().includes(colorSearch)) return false;
     return true;
   });
@@ -311,7 +326,7 @@ function rowHtml(h) {
   return `<tr>
     <td><input type="checkbox" ${checked} onchange="onToggleSelect('${h.id}', this.checked)" /></td>
     <td class="horse-thumb">${img}</td>
-    <td><a href="view.html?id=${h.id}">${escapeHtml(h.name)}</a></td>
+    <td><div class="name-cell-inner"><a href="view.html?id=${h.id}">${escapeHtml(h.name)}</a>${tagsBadgesHtml(h.tags)}</div></td>
     <td>${escapeHtml(h.breed || '')}</td>
     <td>${h.genetic_potential ?? ''}</td>
     <td>${conformationText(h.conformationCounts)}<br><span class="muted small">Score: ${h.conformationScore != null ? h.conformationScore + '%' : '–'}</span></td>
@@ -319,6 +334,7 @@ function rowHtml(h) {
     <td>${specialTraitLossText(h.specialTraitLoss)}</td>
     <td>${h.relatedness != null ? h.relatedness + '%' : '–'}</td>
     <td>${h.offspringCount}</td>
+    <td>${h.halfSiblingCount}</td>
     <td><strong>${h.totalScore != null ? h.totalScore : '–'}</strong></td>
     <td class="actions-cell">
       <a class="btn secondary icon-btn" href="horse.html?id=${h.id}" title="Bearbeiten">✏️</a>

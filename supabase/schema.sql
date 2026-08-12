@@ -60,6 +60,7 @@ create table if not exists public.horses (
 
   notes text,
   owner text,                    -- freier Text, z.B. falls Pferde eines Zuchtpartners mitgefuehrt werden
+  tags jsonb,                    -- Schlagwoerter, Array von Labels (siehe HORSE_TAG_OPTIONS in js/tags.js)
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

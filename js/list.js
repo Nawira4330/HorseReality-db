@@ -43,6 +43,7 @@ function populateFilterOptions() {
   fillSelect('#f-gender', genders);
   fillSelect('#f-breed', breeds);
   fillSelect('#f-owner', owners);
+  fillSelect('#f-tag', HORSE_TAG_OPTIONS.map((t) => t.label));
 }
 
 function fillSelect(selector, values) {
@@ -60,6 +61,7 @@ function resetFilters() {
   document.querySelector('#f-gender').value = '';
   document.querySelector('#f-breed').value = '';
   document.querySelector('#f-owner').value = '';
+  document.querySelector('#f-tag').value = '';
   document.querySelector('#f-gp-min').value = '';
   document.querySelector('#f-coi-max').value = '';
   render();
@@ -70,6 +72,7 @@ function getFiltered() {
   const gender = document.querySelector('#f-gender').value;
   const breed = document.querySelector('#f-breed').value;
   const owner = document.querySelector('#f-owner').value;
+  const tag = document.querySelector('#f-tag').value;
   const gpMin = document.querySelector('#f-gp-min').value;
   const coiMax = document.querySelector('#f-coi-max').value;
 
@@ -78,6 +81,7 @@ function getFiltered() {
     if (gender && h.gender !== gender) return false;
     if (breed && h.breed !== breed) return false;
     if (owner && h.owner !== owner) return false;
+    if (tag && !(h.tags || []).includes(tag)) return false;
     if (gpMin && !(h.genetic_potential >= parseFloat(gpMin))) return false;
     if (coiMax && !(h.coi <= parseFloat(coiMax))) return false;
     return true;
@@ -110,9 +114,10 @@ function rowHtml(h) {
   const img = h.image_url
     ? `<img src="${escapeHtml(h.image_url)}" alt="" />`
     : '';
-  const nameCell = h.link
+  const nameLink = h.link
     ? `<a href="view.html?id=${h.id}">${escapeHtml(h.name)}</a> <a href="${escapeHtml(h.link)}" target="_blank" title="Im Spiel öffnen">🔗</a>`
     : `<a href="view.html?id=${h.id}">${escapeHtml(h.name)}</a>`;
+  const nameCell = `<div class="name-cell-inner">${nameLink}${tagsBadgesHtml(h.tags)}</div>`;
   const genetics = h.tested_colours ? escapeHtml(h.tested_colours) : '<span class="muted">–</span>';
   const parents = [h.sire_name, h.dam_name].filter(Boolean).map(escapeHtml).join(' × ') || '<span class="muted">–</span>';
 

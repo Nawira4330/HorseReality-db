@@ -40,6 +40,10 @@
             <select id="f-owner"><option value="">Alle</option></select>
           </div>
           <div class="field">
+            <label for="f-tag">Schlagwort</label>
+            <select id="f-tag"><option value="">Alle</option></select>
+          </div>
+          <div class="field">
             <label for="f-color">Farbe (Genetik enthält)</label>
             <input type="text" id="f-color" placeholder="z.B. SW1, Cr, Ee..." />
           </div>
@@ -85,6 +89,7 @@
             <th data-sort="specialTraitLossRatio">Sonderfarben von Eltern</th>
             <th data-sort="relatedness">Verwandtschaftsgrad (Ø-COI)</th>
             <th data-sort="offspringCount">Nachkommen</th>
+            <th data-sort="halfSiblingCount">Halbgeschwister</th>
             <th data-sort="totalScore">Gesamt-Score</th>
             <th>Aktionen</th>
           </tr>
@@ -99,6 +104,7 @@
   <script src="js/auth.js"></script>
   <script src="js/pedigree.js"></script>
   <script src="js/genetics.js"></script>
+  <script src="js/tags.js"></script>
   <script src="js/sortierhilfe.js"></script>
 </body>
 </html>

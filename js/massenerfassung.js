@@ -20,6 +20,7 @@ async function init() {
   // Extra-Klick nötig, damit viele Pferde schnell hintereinander gehen.
   document.querySelector('#paste-text').addEventListener('paste', () => setTimeout(onParse, 0));
   document.querySelector('#paste-text').addEventListener('paste', onPasteTextHtml);
+  renderTagCheckboxes('#tag-checkboxes');
 
   document.querySelector('#f-name').focus();
 }
@@ -193,6 +194,8 @@ function buildPayload() {
   if (currentDisciplines) payload.disciplines = currentDisciplines;
   if (currentExterior) payload.exterior = currentExterior;
   if (owner) payload.owner = owner;
+  const tags = readTagCheckboxes('#tag-checkboxes');
+  if (tags.length) payload.tags = tags;
   return payload;
 }
 
@@ -207,20 +210,34 @@ async function onSaveAndNext(e) {
     return;
   }
 
-  // Gleiche hr_id oder gleicher Name -> bestehendes Pferd aktualisieren statt doppelt anzulegen.
+  // Gleiche hr_id oder gleicher Name -> bestehendes Pferd statt einer
+  // Dopplung aktualisieren - aber erst nachfragen und nur ergänzen (siehe
+  // mergePayloadWithExisting), damit ein erneuter Teil-Paste (z.B. nur
+  // Colour, ohne Passport/Stammbaum) nicht versehentlich bereits erfasste
+  // Werte des bestehenden Pferds überschreibt. Bei der Massenerfassung ist
+  // das besonders wichtig, da das Formular hier (anders als beim Bearbeiten
+  // über horse.html) nie mit den vorhandenen Werten vorbefüllt ist.
   let existing = null;
   if (payload.hr_id) {
-    const { data } = await supabaseClient.from('horses').select('id').eq('hr_id', payload.hr_id).maybeSingle();
+    const { data } = await supabaseClient.from('horses').select('*').eq('hr_id', payload.hr_id).maybeSingle();
     existing = data;
   }
   if (!existing) {
-    const { data } = await supabaseClient.from('horses').select('id').ilike('name', payload.name).maybeSingle();
+    const { data } = await supabaseClient.from('horses').select('*').ilike('name', payload.name).maybeSingle();
     existing = data;
   }
 
   let result;
+  let updated = false;
   if (existing) {
-    result = await supabaseClient.from('horses').update(payload).eq('id', existing.id).select('id,name').maybeSingle();
+    const proceed = confirm(`"${existing.name}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`);
+    if (!proceed) {
+      errorBox.textContent = 'Speichern abgebrochen.';
+      return;
+    }
+    updated = true;
+    const merged = mergePayloadWithExisting(payload, existing);
+    result = await supabaseClient.from('horses').update(merged).eq('id', existing.id).select('id,name').maybeSingle();
   } else {
     result = await supabaseClient.from('horses').insert(payload).select('id,name').maybeSingle();
   }
@@ -230,7 +247,7 @@ async function onSaveAndNext(e) {
     return;
   }
 
-  sessionEntries.unshift({ id: result.data.id, name: result.data.name, updated: !!existing });
+  sessionEntries.unshift({ id: result.data.id, name: result.data.name, updated });
   renderSessionList();
   clearForm(true);
 }

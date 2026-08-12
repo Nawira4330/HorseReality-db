@@ -19,33 +19,36 @@ const HORSE_LIGHT_COLUMNS_BASE = [
   'sire_hr_id', 'sire_name', 'sire_link', 'dam_hr_id', 'dam_name', 'dam_link',
   'pedigree_tree', 'pangare', 'sooty', 'flaxen', 'sabino',
 ];
-const HORSE_LIGHT_COLUMNS = HORSE_LIGHT_COLUMNS_BASE.concat('owner').join(', ');
-const HORSE_LIGHT_COLUMNS_NO_OWNER = HORSE_LIGHT_COLUMNS_BASE.join(', ');
+// Spalten aus späteren Migrationen (siehe supabase/migration_*.sql) - fehlt
+// eine davon in der DB (Migration noch nicht ausgeführt), wird sie beim
+// Laden automatisch weggelassen statt die gesamte Stammbaum-/Inzucht-/
+// Vergleichs-/Aussortier-Funktionalität zu blockieren, nur weil eine
+// einzelne optionale Spalte fehlt (siehe fetchAllHorsesLight unten).
+const HORSE_LIGHT_OPTIONAL_COLUMNS = ['owner', 'tags'];
 
 const PAGE_SIZE = 1000;
 
-// Lädt alle Pferde mit den für Stammbaum-Berechnungen nötigen Spalten
-// (kein select('*'), um raw_text/pedigree_tree bei vielen Zeilen nicht
-// unnötig oft mitzuladen) - paginiert per .range(), falls die Tabelle die
-// PostgREST-Standardgrenze (1000 Zeilen) überschreitet. Fällt automatisch
-// auf eine Spaltenliste ohne "owner" zurück, falls migration_001_owner.sql
-// noch nicht ausgeführt wurde - sonst wäre ohne dieses Feld die gesamte
-// Stammbaum-/Inzucht-/Vergleichs-Funktionalität blockiert, nur weil eine
-// einzelne (optionale) Spalte fehlt.
+// Lädt alle Pferde mit den für Stammbaum-Berechnungen nötigen Spalten (kein
+// select('*'), um raw_text/pedigree_tree bei vielen Zeilen nicht unnötig oft
+// mitzuladen) - paginiert per .range(), falls die Tabelle die
+// PostgREST-Standardgrenze (1000 Zeilen) überschreitet. Meldet die Abfrage
+// eine fehlende optionale Spalte, wird genau diese entfernt und erneut
+// versucht (mehrfach hintereinander, falls mehrere Migrationen fehlen).
 async function fetchAllHorsesLight() {
   const all = [];
   let from = 0;
-  let columns = HORSE_LIGHT_COLUMNS;
+  let optionalColumns = [...HORSE_LIGHT_OPTIONAL_COLUMNS];
   for (;;) {
-    let { data, error } = await supabaseClient
-      .from('horses')
-      .select(columns)
-      .range(from, from + PAGE_SIZE - 1);
-    if (error && columns === HORSE_LIGHT_COLUMNS && /column .*owner.* does not exist/i.test(error.message)) {
-      columns = HORSE_LIGHT_COLUMNS_NO_OWNER;
+    let columns = HORSE_LIGHT_COLUMNS_BASE.concat(optionalColumns).join(', ');
+    let { data, error } = await supabaseClient.from('horses').select(columns).range(from, from + PAGE_SIZE - 1);
+    while (error) {
+      const m = error.message.match(/column\s+"?(?:\w+\.)?(\w+)"?\s+does not exist/i);
+      const missing = m && optionalColumns.includes(m[1]) ? m[1] : null;
+      if (!missing) throw new Error(`Supabase-Fehler beim Laden der Pferde: ${error.message}`);
+      optionalColumns = optionalColumns.filter((c) => c !== missing);
+      columns = HORSE_LIGHT_COLUMNS_BASE.concat(optionalColumns).join(', ');
       ({ data, error } = await supabaseClient.from('horses').select(columns).range(from, from + PAGE_SIZE - 1));
     }
-    if (error) throw new Error(`Supabase-Fehler beim Laden der Pferde: ${error.message}`);
     if (!data || data.length === 0) break;
     all.push(...data);
     if (data.length < PAGE_SIZE) break;
@@ -127,6 +130,19 @@ function findSiblingsBySire(horse, allHorses) {
 function findSiblingsByDam(horse, allHorses) {
   if (!horse.dam_hr_id) return [];
   return allHorses.filter((h) => h.id !== horse.id && h.dam_hr_id === horse.dam_hr_id);
+}
+
+// Halbgeschwister: teilen genau EIN Elternteil (Vater ODER Mutter, nicht
+// beide - wer beide teilt, ist ein volles Geschwister und zählt hier bewusst
+// nicht mit, siehe Aussortierhilfe).
+function findHalfSiblings(horse, allHorses) {
+  const bySire = new Set(findSiblingsBySire(horse, allHorses).map((h) => h.id));
+  const byDam = new Set(findSiblingsByDam(horse, allHorses).map((h) => h.id));
+  const halfIds = new Set([
+    ...[...bySire].filter((id) => !byDam.has(id)),
+    ...[...byDam].filter((id) => !bySire.has(id)),
+  ]);
+  return allHorses.filter((h) => halfIds.has(h.id));
 }
 
 // Findet gemeinsame Vorfahren zweier (tiefer) Stammbäume - jedes

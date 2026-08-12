@@ -17,6 +17,7 @@ async function init() {
   document.querySelector('#delete-btn').addEventListener('click', onDelete);
   document.querySelector('#f-image').addEventListener('paste', onImagePaste);
   document.querySelector('#paste-text').addEventListener('paste', onPasteTextHtml);
+  renderTagCheckboxes('#tag-checkboxes');
 
   const params = new URLSearchParams(location.search);
   editingId = params.get('id');
@@ -41,6 +42,7 @@ async function loadExisting(id) {
   if (data.disciplines) currentDisciplines = data.disciplines;
   if (data.exterior) currentExterior = data.exterior;
   fillForm(data);
+  fillTagCheckboxes('#tag-checkboxes', data.tags);
 }
 
 // Erlaubt das Einfügen eines direkt kopierten Bilds (z.B. per Rechtsklick
@@ -210,10 +212,13 @@ function buildPayload() {
   if (currentColors) payload.colors = currentColors;
   if (currentDisciplines) payload.disciplines = currentDisciplines;
   if (currentExterior) payload.exterior = currentExterior;
-  // "owner" nur mitschicken, wenn tatsächlich ausgefüllt - so bricht das
-  // Speichern nicht, solange migration_001_owner.sql noch nicht ausgeführt
-  // wurde (die Spalte existiert dann noch nicht in der Datenbank).
+  // "owner"/"tags" nur mitschicken, wenn tatsächlich ausgefüllt - so bricht
+  // das Speichern nicht, solange migration_001_owner.sql/migration_002_tags.sql
+  // noch nicht ausgeführt wurden (die Spalten existieren dann noch nicht in
+  // der Datenbank).
   if (owner) payload.owner = owner;
+  const tags = readTagCheckboxes('#tag-checkboxes');
+  if (tags.length) payload.tags = tags;
   return payload;
 }
 
@@ -229,21 +234,33 @@ async function onSave(e) {
   }
 
   let result;
+  let updated = !!editingId;
   if (editingId) {
     result = await supabaseClient.from('horses').update(payload).eq('id', editingId).select().maybeSingle();
   } else {
-    // Gleiche hr_id oder gleicher Name -> bestehendes Pferd aktualisieren statt doppelt anzulegen.
+    // Gleiche hr_id oder gleicher Name -> bestehendes Pferd statt einer
+    // Dopplung aktualisieren - aber erst nachfragen und nur ergänzen (siehe
+    // mergePayloadWithExisting), damit ein erneuter Teil-Paste (z.B. nur
+    // Colour, ohne Passport/Stammbaum) nicht versehentlich bereits erfasste
+    // Werte des bestehenden Pferds überschreibt.
     let existing = null;
     if (payload.hr_id) {
-      const { data } = await supabaseClient.from('horses').select('id').eq('hr_id', payload.hr_id).maybeSingle();
+      const { data } = await supabaseClient.from('horses').select('*').eq('hr_id', payload.hr_id).maybeSingle();
       existing = data;
     }
     if (!existing) {
-      const { data } = await supabaseClient.from('horses').select('id').ilike('name', payload.name).maybeSingle();
+      const { data } = await supabaseClient.from('horses').select('*').ilike('name', payload.name).maybeSingle();
       existing = data;
     }
     if (existing) {
-      result = await supabaseClient.from('horses').update(payload).eq('id', existing.id).select().maybeSingle();
+      const proceed = confirm(`"${existing.name}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`);
+      if (!proceed) {
+        errorBox.textContent = 'Speichern abgebrochen.';
+        return;
+      }
+      updated = true;
+      const merged = mergePayloadWithExisting(payload, existing);
+      result = await supabaseClient.from('horses').update(merged).eq('id', existing.id).select().maybeSingle();
     } else {
       result = await supabaseClient.from('horses').insert(payload).select().maybeSingle();
     }
@@ -254,7 +271,7 @@ async function onSave(e) {
     return;
   }
 
-  sessionStorage.setItem('flashMessage', `"${payload.name}" wurde ${editingId ? 'aktualisiert' : 'neu angelegt'}.`);
+  sessionStorage.setItem('flashMessage', `"${payload.name}" wurde ${updated ? 'aktualisiert' : 'neu angelegt'}.`);
   location.href = 'index.html';
 }
 
