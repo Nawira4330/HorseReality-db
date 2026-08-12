@@ -83,20 +83,25 @@ function extractOwnLink(lines) {
 // (<img src=...>) und ggf. echte Links enthalten (der Link zur eigenen
 // Pferdeseite taucht im sichtbaren Text nirgends als Link auf, siehe
 // extractOwnLink oben - in der HTML-Struktur der Seite unter Umständen
-// trotzdem, z.B. als "Teilen"-Link oder Canonical-Verweis). Best-Effort-
-// Heuristik, da die genaue HTML-Struktur der Spielseite nicht bekannt ist
-// (anders als beim Schwesterprojekt MDR-Datenbank, das eine bekannte
-// Bild-ID nutzt): das größte eingebundene Bild wird als Pferdebild
-// angenommen. Relative Pfade werden gegen die Spiel-Domain aufgelöst -
-// DOMParser würde sie sonst fälschlich gegen die aktuelle Seite (also diese
-// Datenbank-App) auflösen.
+// trotzdem, z.B. als "Teilen"-Link oder Canonical-Verweis). Pferdefotos
+// werden über eine eigene Bild-Domain ausgeliefert (bestätigtes Beispiel:
+// https://horse-img.horsereality.com/large/...) - Bilder von dort werden
+// bevorzugt gewählt (bei mehreren Größenvarianten die "/large/"-Variante),
+// das ist zuverlässiger als der Versuch, Seiten-Chrome (Logo, Icons,
+// Kartensymbole etc.) per Ausschlussliste zu erkennen, die nie vollständig
+// sein kann. Nur falls kein Bild von dieser Domain im eingefügten HTML
+// steckt, greift ersatzweise die alte Ausschlussliste-Heuristik. Relative
+// Pfade werden gegen die Spiel-Domain aufgelöst - DOMParser würde sie sonst
+// fälschlich gegen die aktuelle Seite (also diese Datenbank-App) auflösen.
+const HORSE_IMAGE_HOST_RE = /^https?:\/\/horse-img\.horsereality\.com\//i;
+const CHROME_IMAGE_HINT_RE = /logo|favicon|icon|sprite|flag|badge|avatar-default|placeholder|spinner|loading|\/world\/|map-/i;
 function extractFromPasteHtml(html) {
   const result = {};
   if (!html || typeof DOMParser === 'undefined') return result;
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const base = 'https://www.horsereality.com/';
 
-  const images = [...doc.querySelectorAll('img[src]')]
+  const allImages = [...doc.querySelectorAll('img[src]')]
     .map((img) => {
       const raw = img.getAttribute('src');
       let resolved;
@@ -106,9 +111,19 @@ function extractFromPasteHtml(html) {
       return { src: resolved, area: w * h };
     })
     .filter((i) => i && /^https?:\/\//.test(i.src));
-  if (images.length) {
-    images.sort((a, b) => b.area - a.area);
-    result.image_url = images[0].src;
+
+  const horseImages = allImages.filter((i) => HORSE_IMAGE_HOST_RE.test(i.src));
+  const candidates = horseImages.length
+    ? horseImages
+    : allImages.filter((i) => !CHROME_IMAGE_HINT_RE.test(i.src));
+  if (candidates.length) {
+    candidates.sort((a, b) => {
+      const aLarge = /\/large\//i.test(a.src) ? 1 : 0;
+      const bLarge = /\/large\//i.test(b.src) ? 1 : 0;
+      if (aLarge !== bLarge) return bLarge - aLarge;
+      return b.area - a.area;
+    });
+    result.image_url = candidates[0].src;
   }
 
   for (const a of doc.querySelectorAll('a[href]')) {
