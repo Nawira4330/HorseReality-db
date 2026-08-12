@@ -168,6 +168,16 @@ function findLabelValue(lines, label, from = 0, to = lines.length) {
 // dürfen nie als Beschreibung oder Rasse missverstanden werden.
 const BADGE_WORDS = new Set(['Foundation Breeder', 'BETA', 'Needs care', 'Care']);
 
+// Erkennt Werte-Badge-/Bewertungs-Zeilen im linkfreien Stammbaum-Format
+// (z.B. "GP 640", "COI: n/a", "☆ 821/13:1:0:0/91.515", "14VG* 92.3 GGGGG",
+// "10:4 |866| G/D/SW1/To") - das Format ist nicht einheitlich (jede Person
+// schreibt den Untertitel ihrer Pferde anders, siehe extractAncestorStats),
+// aber Konformationsnoten (VG/G+ usw.), "GP"/"COI:" gefolgt von Ziffern,
+// Trennzeichen (|, ┃, ☆, ★) oder Erfolgsstatistiken ("13:1:0:0") kommen in
+// echten Pferdenamen praktisch nie vor. Verhindert, dass sowas fälschlich
+// als Vorfahren-Name gespeichert wird (siehe Vorfall 12.08.2026).
+const PEDIGREE_BADGE_LINE_RE = /\bVG\b|\bGP\s?\d|COI\s*:|[|┃☆★]|\d+:\d+:\d+/i;
+
 function parseHeaderBlock(lines) {
   const result = {};
   if (!lines[0]) return result;
@@ -429,19 +439,22 @@ function parsePedigreeBlock(lines) {
     } else if (/^unknown$/i.test(line)) {
       entries.push(null);
       i++;
+    } else if (BADGE_WORDS.has(line) || PEDIGREE_BADGE_LINE_RE.test(line)) {
+      // Werte-Badge/Bewertung/Stall-Zeile (siehe PEDIGREE_BADGE_LINE_RE) -
+      // keine eigene Stammbaum-Position, wird übersprungen statt fälschlich
+      // als Vorfahren-Name übernommen zu werden.
+      i++;
     } else {
       // Manche Kopiermethoden liefern den Stammbaum ohne Markdown-Links
       // (reiner Name statt "[Name](url)") - dann lässt sich hr_id/Link
-      // nicht ermitteln, der Name selbst aber schon. Nur das bekannte
-      // "Foundation Breeder"-Abzeichen wird als Zusatzzeile übersprungen,
-      // da sich ohne Link-basierte Abgrenzung nicht zuverlässig erkennen
-      // lässt, wie viele Zusatzzeilen (Werte-Badge, Stallname) zu einem
-      // regulär gezüchteten Vorfahren gehören - dafür bleibt weiterhin ein
-      // Link-Paste nötig.
-      let next = i + 1;
-      if (BADGE_WORDS.has(lines[next])) next++;
+      // nicht ermitteln, der Name selbst aber schon. Ein Stall-/Zuchtname
+      // ohne erkennbare Zahlen/Symbole (z.B. "Nordrassil") ist von einem
+      // echten Vorfahren-Namen weiterhin nicht sicher unterscheidbar und
+      // kann fälschlich als eigener Platz gezählt werden - für zuverlässige
+      // tiefe Stammbäume bleibt ein Link-Paste nötig, aber Vater/Mutter
+      // (die ersten Einträge) sind davon in der Praxis kaum betroffen.
       entries.push({ name: line, link: null, hr_id: null });
-      i = next;
+      i++;
     }
   }
 
