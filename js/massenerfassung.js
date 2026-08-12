@@ -187,8 +187,18 @@ function buildPayload() {
     payload.pedigree_tree = currentPedigreeTree;
     const sire = currentPedigreeTree.find((t) => t.path === 'S');
     const dam = currentPedigreeTree.find((t) => t.path === 'D');
-    if (sire && sire.hr_id) { payload.sire_hr_id = sire.hr_id; payload.sire_name = sire.name; payload.sire_link = sire.link; }
-    if (dam && dam.hr_id) { payload.dam_hr_id = dam.hr_id; payload.dam_name = dam.name; payload.dam_link = dam.link; }
+    // Name auch OHNE Spiel-ID speichern (nötig, wenn der Stammbaum-Ausschnitt
+    // ohne Links kopiert wurde, siehe parsePedigreeBlock) - nur hr_id/Link
+    // brauchen zwingend die ID, sonst würde z.B. "Álfsteinn" als Vater
+    // nirgends gespeichert, obwohl der Name im Text stand.
+    if (sire && sire.name) {
+      payload.sire_name = sire.name;
+      if (sire.hr_id) { payload.sire_hr_id = sire.hr_id; payload.sire_link = sire.link; }
+    }
+    if (dam && dam.name) {
+      payload.dam_name = dam.name;
+      if (dam.hr_id) { payload.dam_hr_id = dam.hr_id; payload.dam_link = dam.link; }
+    }
   }
   if (currentColors) payload.colors = currentColors;
   if (currentDisciplines) payload.disciplines = currentDisciplines;

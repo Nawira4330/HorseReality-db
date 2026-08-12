@@ -115,21 +115,47 @@ function buildDeepPedigree(horse, horsesByHrId, maxGeneration = PEDIGREE_MAX_GEN
   ];
 }
 
+function normalizedName(s) {
+  return s ? s.trim().toLowerCase() : '';
+}
+
 // Direkte Nachkommen: alle Pferde, deren sire_hr_id/dam_hr_id auf dieses
-// Pferd zeigen (nur möglich, wenn dieses Pferd selbst eine hr_id hat).
+// Pferd zeigen - oder, wenn das andere Pferd dort keine Spiel-ID hat (z.B.
+// weil der Stammbaum-Ausschnitt ohne Links kopiert wurde, siehe
+// parsePedigreeBlock), ersatzweise per Namensvergleich: sire_name/dam_name
+// entspricht exakt dem Namen dieses Pferds. Eine vorhandene hr_id gilt
+// immer als zuverlässiger und hat Vorrang vor dem Namensvergleich.
 function findOffspring(horse, allHorses) {
-  if (!horse.hr_id) return [];
-  return allHorses.filter((h) => h.sire_hr_id === horse.hr_id || h.dam_hr_id === horse.hr_id);
+  const name = normalizedName(horse.name);
+  return allHorses.filter((h) => {
+    if (h.id === horse.id) return false;
+    if (horse.hr_id && (h.sire_hr_id === horse.hr_id || h.dam_hr_id === horse.hr_id)) return true;
+    if (!h.sire_hr_id && h.sire_name && normalizedName(h.sire_name) === name) return true;
+    if (!h.dam_hr_id && h.dam_name && normalizedName(h.dam_name) === name) return true;
+    return false;
+  });
 }
 
 function findSiblingsBySire(horse, allHorses) {
-  if (!horse.sire_hr_id) return [];
-  return allHorses.filter((h) => h.id !== horse.id && h.sire_hr_id === horse.sire_hr_id);
+  if (horse.sire_hr_id) {
+    return allHorses.filter((h) => h.id !== horse.id && h.sire_hr_id === horse.sire_hr_id);
+  }
+  if (horse.sire_name) {
+    const name = normalizedName(horse.sire_name);
+    return allHorses.filter((h) => h.id !== horse.id && !h.sire_hr_id && h.sire_name && normalizedName(h.sire_name) === name);
+  }
+  return [];
 }
 
 function findSiblingsByDam(horse, allHorses) {
-  if (!horse.dam_hr_id) return [];
-  return allHorses.filter((h) => h.id !== horse.id && h.dam_hr_id === horse.dam_hr_id);
+  if (horse.dam_hr_id) {
+    return allHorses.filter((h) => h.id !== horse.id && h.dam_hr_id === horse.dam_hr_id);
+  }
+  if (horse.dam_name) {
+    const name = normalizedName(horse.dam_name);
+    return allHorses.filter((h) => h.id !== horse.id && !h.dam_hr_id && h.dam_name && normalizedName(h.dam_name) === name);
+  }
+  return [];
 }
 
 // Halbgeschwister: teilen genau EIN Elternteil (Vater ODER Mutter, nicht

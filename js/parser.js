@@ -542,15 +542,19 @@ function parseHorseRealityText(rawText) {
     result.pedigree_tree = pedigree.tree;
     const sire = pedigree.tree.find((t) => t.path === 'S');
     const dam = pedigree.tree.find((t) => t.path === 'D');
-    if (sire && sire.hr_id) {
-      result.sire_hr_id = sire.hr_id;
+    if (sire && sire.name) {
       result.sire_name = sire.name;
-      result.sire_link = sire.link;
+      if (sire.hr_id) {
+        result.sire_hr_id = sire.hr_id;
+        result.sire_link = sire.link;
+      }
     }
-    if (dam && dam.hr_id) {
-      result.dam_hr_id = dam.hr_id;
+    if (dam && dam.name) {
       result.dam_name = dam.name;
-      result.dam_link = dam.link;
+      if (dam.hr_id) {
+        result.dam_hr_id = dam.hr_id;
+        result.dam_link = dam.link;
+      }
     }
   }
 
