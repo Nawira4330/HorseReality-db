@@ -332,6 +332,7 @@ function rowHtml(h) {
     <td>${conformationText(h.conformationCounts)}<br><span class="muted small">Score: ${h.conformationScore != null ? h.conformationScore + '%' : '–'}</span></td>
     <td>${escapeHtml(h.tested_colours || '–')}<br><span class="muted small">${h.colorRarity != null ? h.colorRarity + '% einzigartig' : ''}</span></td>
     <td>${specialTraitLossText(h.specialTraitLoss)}</td>
+    <td>${h.coi != null ? h.coi + '%' : '–'}</td>
     <td>${h.relatedness != null ? h.relatedness + '%' : '–'}</td>
     <td>${h.offspringCount}</td>
     <td>${h.halfSiblingCount}</td>
