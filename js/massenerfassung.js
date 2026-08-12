@@ -230,7 +230,7 @@ async function onSaveAndNext(e) {
   let result;
   let updated = false;
   if (existing) {
-    const proceed = confirm(`"${existing.name}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`);
+    const proceed = confirm(buildDuplicateConfirmMessage(payload.name, existing.name));
     if (!proceed) {
       errorBox.textContent = 'Speichern abgebrochen.';
       return;

@@ -598,3 +598,26 @@ function mergePayloadWithExisting(payload, existing) {
   }
   return merged;
 }
+
+// Baut den Bestätigungstext fürs Speichern eines per hr_id/Name gefundenen,
+// bereits vorhandenen Pferds. Weicht der gefundene Name deutlich vom neu
+// eingegebenen ab, ist das ein Warnzeichen: die hr_id wurde dann vermutlich
+// bei einem früheren Speichern versehentlich einem falschen Datensatz
+// zugeordnet (genau das ist am 12.08. passiert - "573 EA pa" wurde dadurch
+// fälschlich mit den Daten von "554 EA²SW1W21" überschrieben, weil die
+// normale Kurzfrage beim schnellen Durcharbeiten übersehen wurde) - deshalb
+// hier eine deutlich auffälligere Warnung statt der normalen Kurzfrage.
+function buildDuplicateConfirmMessage(newName, existingName) {
+  const differs = existingName && newName
+    && existingName.trim().toLowerCase() !== newName.trim().toLowerCase();
+  if (differs) {
+    return `⚠️ ACHTUNG - ANDERER NAME GEFUNDEN! ⚠️\n\n`
+      + `Du speicherst: "${newName}"\n`
+      + `Gefunden (gleiche Spiel-ID): "${existingName}"\n\n`
+      + `Falls das NICHT dasselbe Pferd ist (z.B. nur im Spiel umbenannt), `
+      + `unbedingt ABBRECHEN wählen - sonst werden die Daten von `
+      + `"${existingName}" überschrieben!\n\n`
+      + `Wirklich zusammenführen?`;
+  }
+  return `"${existingName}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`;
+}

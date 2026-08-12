@@ -253,7 +253,7 @@ async function onSave(e) {
       existing = data;
     }
     if (existing) {
-      const proceed = confirm(`"${existing.name}" ist bereits in der Datenbank. Vorhandene Daten ergänzen/aktualisieren?`);
+      const proceed = confirm(buildDuplicateConfirmMessage(payload.name, existing.name));
       if (!proceed) {
         errorBox.textContent = 'Speichern abgebrochen.';
         return;
