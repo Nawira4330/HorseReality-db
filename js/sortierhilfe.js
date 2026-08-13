@@ -135,26 +135,45 @@ function parseConformationBreakdown(text) {
   return { counts, score };
 }
 
-// --- Farb-Seltenheit: wie viele andere Pferde im Bestand exakt denselben
-// genetischen Farbcode (Tested Colours) teilen. 100% = einzigartig im
-// Bestand, niedrigere Werte = häufiger vorhanden. Reiner Text-Abgleich
-// (kein Verständnis der Genetik dahinter) - zwei Pferde mit
-// unterschiedlicher Reihenfolge derselben Gene würden fälschlich als
-// verschieden gelten, das kommt aber laut bisherigen Beispielen nicht vor.
+// --- Farb-Einzigartigkeit: Anteil aller im GESAMTEN Bestand vorkommenden
+// Sonderfarben-/Musterungs-Gene (Grey, Cream, Dun, Silver, SW1, Leopard,
+// PATN1, W20, W21, ... - aktiv getragen, mind. 1 Kopie, nicht nur "n/n"
+// bzw. rein rezessiv), die DIESES Pferd selbst trägt. Ein Pferd mit ALLEN
+// im Bestand vorkommenden Sonderfarben liegt bei 100%, eines ganz ohne
+// Sonderfarbe bei 0%. Extension/Agouti zählen nicht mit (Basis-Fellfarbe,
+// hat jedes Pferd zwangsläufig in irgendeiner Ausprägung, macht den Wert
+// nicht aussagekräftig). Nutzt bewusst das strukturierte "colors"-Array
+// (Label bekannt) statt den "Tested Colours"-Text zu re-parsen - eine
+// reine Zeichen-Heuristik (Groß-/Kleinschreibung, Zeichenlänge) kann
+// einbuchstabige Sonderfarben wie Grey/Dun/Silver nicht zuverlässig von
+// Extension/Agouti unterscheiden und scheitert am 3-Allel-System bei Dun
+// (D/nd1/nd2, "nd1"/"nd2" sind KEINE Sonderfarbe, sondern deren Fehlen).
+const COLOR_RARITY_EXCLUDED_LABELS = new Set(['Extension', 'Agouti']);
+const NEGATIVE_ALLELE_RE = /^(n|nd1|nd2)$/i;
+function genotypeHasActiveAllele(genotype) {
+  if (!genotype) return false;
+  return genotype.split('/').map((a) => a.trim()).filter(Boolean)
+    .some((a) => !NEGATIVE_ALLELE_RE.test(a) && /[A-Z]/.test(a));
+}
 function computeColorRarity(horses) {
-  const counts = new Map();
+  const allSpecialLabels = new Set();
+  const ownLabelsByHorseId = new Map();
   horses.forEach((h) => {
-    if (!h.tested_colours) return;
-    const key = h.tested_colours.trim();
-    counts.set(key, (counts.get(key) || 0) + 1);
+    const labels = new Set();
+    (h.colors || []).forEach((c) => {
+      if (COLOR_RARITY_EXCLUDED_LABELS.has(c.label)) return;
+      if (!genotypeHasActiveAllele(c.genotype)) return;
+      labels.add(c.label);
+      allSpecialLabels.add(c.label);
+    });
+    ownLabelsByHorseId.set(h.id, labels);
   });
+
+  const total = allSpecialLabels.size;
   return (h) => {
-    if (!h.tested_colours) return null;
-    const key = h.tested_colours.trim();
-    const shared = counts.get(key) || 1;
-    const withColours = horses.filter((x) => x.tested_colours).length;
-    if (withColours <= 1) return 100;
-    return Math.round((1 - (shared - 1) / (withColours - 1)) * 1000) / 10;
+    if (!h.colors || !h.colors.length || total === 0) return null;
+    const own = ownLabelsByHorseId.get(h.id) || new Set();
+    return Math.round((own.size / total) * 1000) / 10;
   };
 }
 
