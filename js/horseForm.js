@@ -246,6 +246,16 @@ async function onSave(e) {
   let result;
   let updated = !!editingId;
   if (editingId) {
+    // Vorab prüfen, ob der (evtl. geänderte) Name schon einem ANDEREN Pferd
+    // gehört - der eindeutige Namens-Index in der Datenbank würde das UPDATE
+    // sonst mit einer rohen SQL-Fehlermeldung ablehnen, die nicht erkennen
+    // lässt, welches andere Pferd den Namen schon hat.
+    const { data: nameClash } = await supabaseClient
+      .from('horses').select('id,name').ilike('name', payload.name).neq('id', editingId).maybeSingle();
+    if (nameClash) {
+      errorBox.textContent = `Der Name "${payload.name}" wird bereits von einem anderen Pferd verwendet. Bitte einen anderen Namen wählen.`;
+      return;
+    }
     result = await supabaseClient.from('horses').update(payload).eq('id', editingId).select().maybeSingle();
   } else {
     // Gleiche hr_id oder gleicher Name -> bestehendes Pferd statt einer
