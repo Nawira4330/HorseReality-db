@@ -1,5 +1,5 @@
 let allHorses = [];
-let horsesByHrId = new Map();
+let pedigreeIndex = null;
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -10,7 +10,7 @@ async function init() {
   document.querySelector('#session-email').textContent = `Angemeldet als: ${displayIdentity(session.user.email)}`;
 
   allHorses = await fetchAllHorsesLight();
-  horsesByHrId = buildHorsesByHrId(allHorses);
+  pedigreeIndex = buildPedigreeIndex(allHorses);
 
   populateOwnerFilter();
   populateHorseSelects();
@@ -59,9 +59,9 @@ function onCheck() {
   const sire = allHorses.find((h) => h.id === sireId);
   const dam = allHorses.find((h) => h.id === damId);
 
-  const pedigreeSire = buildDeepPedigree(sire, horsesByHrId, PEDIGREE_MAX_GENERATION);
-  const pedigreeDam = buildDeepPedigree(dam, horsesByHrId, PEDIGREE_MAX_GENERATION);
-  const { coiPct, commonAncestors } = estimateCOI(pedigreeSire, pedigreeDam, horsesByHrId);
+  const pedigreeSire = buildDeepPedigree(sire, pedigreeIndex, PEDIGREE_MAX_GENERATION);
+  const pedigreeDam = buildDeepPedigree(dam, pedigreeIndex, PEDIGREE_MAX_GENERATION);
+  const { coiPct, commonAncestors } = estimateCOI(pedigreeSire, pedigreeDam, pedigreeIndex);
 
   document.querySelector('#result').hidden = false;
   document.querySelector('#result-coi').textContent = `COI: ${coiPct.toFixed(2)}%`;

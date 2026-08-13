@@ -22,7 +22,8 @@ async function init() {
 
   const allHorses = await fetchAllHorsesLight();
   const horsesByHrId = buildHorsesByHrId(allHorses);
-  renderPedigreeSection(horse, horsesByHrId);
+  const pedigreeIndex = buildPedigreeIndex(allHorses);
+  renderPedigreeSection(horse, pedigreeIndex);
   renderOffspring(horse, allHorses);
   renderOpticalTraitHints(horse, horsesByHrId);
 }
@@ -111,9 +112,9 @@ function setText(selector, value) {
 // voller Tiefe). Die Fächer-Ansicht zeigt deshalb nur die ersten
 // PEDIGREE_DISPLAY_GENERATIONS Generationen; die volle Tiefe fließt aber in
 // den Zusammenfassungstext und in den Inzuchtprüfer ein.
-function renderPedigreeSection(horse, horsesByHrId) {
-  const fullTree = buildDeepPedigree(horse, horsesByHrId, PEDIGREE_MAX_GENERATION);
-  const known = fullTree.filter((n) => n.hr_id);
+function renderPedigreeSection(horse, pedigreeIndex) {
+  const fullTree = buildDeepPedigree(horse, pedigreeIndex, PEDIGREE_MAX_GENERATION);
+  const known = fullTree.filter((n) => n.name);
   if (known.length === 0) return;
 
   document.querySelector('#pedigree-fieldset').hidden = false;
@@ -122,7 +123,7 @@ function renderPedigreeSection(horse, horsesByHrId) {
     `${known.length} bekannte Vorfahren, tiefste aufgelöste Generation: ${deepestGen}` +
     (deepestGen > PEDIGREE_DISPLAY_GENERATIONS ? ` (Anzeige unten begrenzt auf ${PEDIGREE_DISPLAY_GENERATIONS} Generationen)` : '');
 
-  const displayTree = buildDeepPedigree(horse, horsesByHrId, PEDIGREE_DISPLAY_GENERATIONS);
+  const displayTree = buildDeepPedigree(horse, pedigreeIndex, PEDIGREE_DISPLAY_GENERATIONS);
   document.querySelector('#pedigree-fan').innerHTML = renderPedigreeFan(displayTree, horse.name, PEDIGREE_DISPLAY_GENERATIONS);
 }
 

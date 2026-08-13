@@ -162,9 +162,9 @@ function computeColorRarity(horses) {
 // Bestand (gedachte Verpaarungen, nicht tatsächliche) - ein Pferd mit
 // vielen engen Verwandten im eigenen Bestand ist für die Zuchtvielfalt
 // redundanter als ein genetisch "einzigartiges" Pferd.
-function computeRelatedness(horses, horsesByHrId) {
+function computeRelatedness(horses, pedigreeIndex) {
   const pedigreeCache = new Map();
-  horses.forEach((h) => pedigreeCache.set(h.id, buildDeepPedigree(h, horsesByHrId, PEDIGREE_MAX_GENERATION)));
+  horses.forEach((h) => pedigreeCache.set(h.id, buildDeepPedigree(h, pedigreeIndex, PEDIGREE_MAX_GENERATION)));
 
   return (horse) => {
     const others = horses.filter((h) => h.id !== horse.id);
@@ -173,7 +173,7 @@ function computeRelatedness(horses, horsesByHrId) {
     let sum = 0;
     others.forEach((other) => {
       const pedB = pedigreeCache.get(other.id);
-      sum += estimateCOI(pedA, pedB, horsesByHrId).coiPct;
+      sum += estimateCOI(pedA, pedB, pedigreeIndex).coiPct;
     });
     return Math.round((sum / others.length) * 100) / 100;
   };
@@ -181,8 +181,9 @@ function computeRelatedness(horses, horsesByHrId) {
 
 function computeScores(horses) {
   const horsesByHrId = buildHorsesByHrId(horses);
+  const pedigreeIndex = buildPedigreeIndex(horses);
   const rarityFn = computeColorRarity(horses);
-  const relatednessFn = computeRelatedness(horses, horsesByHrId);
+  const relatednessFn = computeRelatedness(horses, pedigreeIndex);
 
   return horses.map((h) => {
     const { counts, score } = parseConformationBreakdown(h.conformation);
@@ -209,17 +210,22 @@ function normalize(value, min, max) {
 
 // Gesamt-Score = gewichteter Durchschnitt aus GP, Conformation und
 // Farb-Seltenheit (0-100 je Wert, der gewählte Schwerpunkt zählt doppelt),
-// ABZÜGLICH dreier Abzüge: bis zu 30 Punkte für hohen Verwandtschaftsgrad
+// ABZÜGLICH vierer Abzüge: bis zu 30 Punkte für hohen Verwandtschaftsgrad
 // (Ø-COI zum restlichen Bestand), bis zu 20 Punkte für eine hohe
 // Nachkommenzahl (beides relativ zum höchsten Wert im Bestand normiert),
-// und bis zu 20 Punkte dafür, dass ein Pferd Sonderfarben/Musterungen
-// seiner Eltern nicht geerbt hat - je mehr ein Pferd bereits genetisch im
-// Bestand vertreten ist (durch Verwandtschaft oder eigene Nachkommen) oder
-// je mehr elterliche Sonderfarben ihm fehlen, desto stärker drückt das den
-// Score, unabhängig vom gewählten Schwerpunkt. Ergebnis auf 0-100 begrenzt.
+// bis zu 20 Punkte dafür, dass ein Pferd Sonderfarben/Musterungen seiner
+// Eltern nicht geerbt hat, und bis zu 20 Punkte für den EIGENEN COI-Wert
+// des Pferds (wie stark seine eigenen Eltern selbst schon verwandt waren,
+// direkt vom Spiel berechnet - anders als der Verwandtschaftsgrad, der sich
+// auf den restlichen Bestand bezieht) - je mehr ein Pferd bereits genetisch
+// im Bestand vertreten ist, je mehr elterliche Sonderfarben ihm fehlen,
+// oder je stärker es selbst schon eingezüchtet ist, desto stärker drückt
+// das den Score, unabhängig vom gewählten Schwerpunkt. Ergebnis auf 0-100
+// begrenzt.
 const RELATEDNESS_MAX_PENALTY = 30;
 const OFFSPRING_MAX_PENALTY = 20;
 const SPECIAL_TRAIT_LOSS_MAX_PENALTY = 20;
+const OWN_COI_MAX_PENALTY = 20;
 
 function totalScore(h, focus, ranges) {
   const gpNorm = normalize(h.genetic_potential, ranges.gp.min, ranges.gp.max);
@@ -241,8 +247,10 @@ function totalScore(h, focus, ranges) {
     : (normalize(h.offspringCount, 0, ranges.offspring.max) / 100) * OFFSPRING_MAX_PENALTY;
   const specialTraitPenalty = h.specialTraitLossRatio == null ? 0
     : (h.specialTraitLossRatio / 100) * SPECIAL_TRAIT_LOSS_MAX_PENALTY;
+  const ownCoiPenalty = h.coi == null ? 0
+    : (Math.min(h.coi, 100) / 100) * OWN_COI_MAX_PENALTY;
 
-  const total = baseScore - relPenalty - offspringPenalty - specialTraitPenalty;
+  const total = baseScore - relPenalty - offspringPenalty - specialTraitPenalty - ownCoiPenalty;
   return Math.round(Math.max(0, Math.min(100, total)) * 10) / 10;
 }
 
