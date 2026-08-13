@@ -15,7 +15,7 @@ const PEDIGREE_MAX_GENERATION = 18;
 
 const HORSE_LIGHT_COLUMNS_BASE = [
   'id', 'hr_id', 'name', 'link', 'image_url', 'gender', 'breed',
-  'genetic_potential', 'conformation', 'tested_colours', 'coi',
+  'genetic_potential', 'conformation', 'tested_colours', 'colors', 'coi',
   'sire_hr_id', 'sire_name', 'sire_link', 'dam_hr_id', 'dam_name', 'dam_link',
   'pedigree_tree', 'pangare', 'sooty', 'flaxen', 'sabino',
 ];

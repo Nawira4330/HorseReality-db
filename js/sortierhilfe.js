@@ -177,16 +177,19 @@ function computeColorRarity(horses) {
   };
 }
 
-// --- Verwandtschaftsgrad: Ø-COI dieses Pferds mit jedem anderen Pferd im
-// Bestand (gedachte Verpaarungen, nicht tatsächliche) - ein Pferd mit
-// vielen engen Verwandten im eigenen Bestand ist für die Zuchtvielfalt
-// redundanter als ein genetisch "einzigartiges" Pferd.
+// --- Verwandtschaftsgrad: Ø-COI dieses Pferds mit jedem anderen Pferd
+// DERSELBEN RASSE im Bestand (gedachte Verpaarungen, nicht tatsächliche) -
+// ein Pferd mit vielen engen Verwandten in der eigenen Rasse ist für die
+// Zuchtvielfalt redundanter als ein genetisch "einzigartiges" Pferd.
+// Rassenübergreifend verglichen wäre der COI ohnehin praktisch immer 0%
+// (keine gemeinsamen Vorfahren zwischen z.B. Icelandic Horse und Appaloosa
+// Horse) und würde den Durchschnitt nur künstlich verwässern.
 function computeRelatedness(horses, pedigreeIndex) {
   const pedigreeCache = new Map();
   horses.forEach((h) => pedigreeCache.set(h.id, buildDeepPedigree(h, pedigreeIndex, PEDIGREE_MAX_GENERATION)));
 
   return (horse) => {
-    const others = horses.filter((h) => h.id !== horse.id);
+    const others = horses.filter((h) => h.id !== horse.id && h.breed === horse.breed);
     if (others.length === 0) return null;
     const pedA = pedigreeCache.get(horse.id);
     let sum = 0;
@@ -230,7 +233,7 @@ function normalize(value, min, max) {
 // Gesamt-Score = gewichteter Durchschnitt aus GP, Conformation und
 // Farb-Seltenheit (0-100 je Wert, der gewählte Schwerpunkt zählt doppelt),
 // ABZÜGLICH vierer Abzüge: bis zu 30 Punkte für hohen Verwandtschaftsgrad
-// (Ø-COI zum restlichen Bestand), bis zu 20 Punkte für eine hohe
+// (Ø-COI zur restlichen eigenen Rasse), bis zu 20 Punkte für eine hohe
 // Nachkommenzahl (beides relativ zum höchsten Wert im Bestand normiert),
 // bis zu 20 Punkte dafür, dass ein Pferd Sonderfarben/Musterungen seiner
 // Eltern nicht geerbt hat, und bis zu 20 Punkte für den EIGENEN COI-Wert
