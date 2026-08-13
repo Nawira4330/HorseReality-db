@@ -207,11 +207,18 @@ function findHalfSiblings(horse, allHorses) {
 // mehrere Pfade auftauchen, falls dort schon Inzucht vorliegt). Schlüssel
 // ist bevorzugt die interne Datenbank-ID (horse_id, siehe resolveSubtree -
 // funktioniert unabhängig davon, ob der Vorfahre über hr_id oder Namen
-// gefunden wurde), ersatzweise die Spiel-ID (hr_id) für Vorfahren, die nur
-// aus dem beim Einfügen erkannten Stammbaum-Ausschnitt stammen und nicht
-// selbst als eigenes Pferd gespeichert sind.
+// gefunden wurde), dann die Spiel-ID (hr_id) für Vorfahren, die nur aus dem
+// beim Einfügen erkannten Stammbaum-Ausschnitt stammen und nicht selbst als
+// eigenes Pferd gespeichert sind - und ERSATZWEISE der Name, damit auch ein
+// gemeinsamer Vorfahre zählt, der GAR NICHT in der eigenen Datenbank
+// gespeichert ist (z.B. ein fremdes Zuchtpferd, das zwei eigene Pferde im
+// (nur best-effort gelesenen) Stammbaum-Ausschnitt gemeinsam haben). Der
+// Beitrag zum COI sinkt mit (0.5)^(Generation), ein zufällig gleicher Name
+// tief im Baum (siehe parsePedigreeBlock - Stall-/Zuchtnamen sind dort
+// nicht immer sicher von echten Pferdenamen unterscheidbar) wirkt sich
+// dadurch ohnehin kaum aus.
 function findCommonAncestors(pedigreeA, pedigreeB) {
-  const keyOf = (n) => n.horse_id || n.hr_id;
+  const keyOf = (n) => n.horse_id || n.hr_id || (n.name ? `name:${normalizedName(n.name)}` : null);
   const byIdA = new Map();
   pedigreeA.filter((n) => keyOf(n)).forEach((n) => {
     const k = keyOf(n);
