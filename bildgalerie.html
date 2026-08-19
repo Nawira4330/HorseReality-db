@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Bildergalerie – Horse Reality Datenbank</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+    .gallery-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .gallery-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: var(--border); }
+    .gallery-card .gallery-info { padding: 0.4rem 0.5rem; }
+    .gallery-card .gallery-name { font-weight: 600; font-size: 0.85rem; }
+    .gallery-card .gallery-traits { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+    .gallery-noimg { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.75rem; text-align: center; padding: 0.5rem; }
+    .breed-heading { font-family: var(--font-heading); font-size: 1.3rem; color: var(--accent-dark); margin: 1.5rem 0 0.6rem; }
+    .breed-heading:first-of-type { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🐴 Horse Reality Datenbank</h1>
+    <nav>
+      <a class="btn secondary" href="index.html">← Übersicht</a>
+      <span id="session-email" class="muted small"></span>
+      <button id="logout-btn" class="secondary">Abmelden</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Bildergalerie</h2>
+    <p class="muted small">Zum visuellen Durchsehen (z.B. Pangaré/Sooty/Flaxen/Sabino, die das Spiel nicht genetisch aufschlüsselt) - nach Rasse und Name sortiert.</p>
+    <p id="result-count" class="muted small"></p>
+    <div id="gallery-root"></div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/bildgalerie.js"></script>
+</body>
+</html>

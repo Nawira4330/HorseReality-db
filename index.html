@@ -14,6 +14,7 @@
     <nav>
       <a class="btn" href="horse.html">+ Neues Pferd</a>
       <a class="btn secondary" href="massenerfassung.html">📋 Massenerfassung</a>
+      <a class="btn secondary" href="bildgalerie.html">🖼️ Bildergalerie</a>
       <a class="btn secondary" href="inzucht.html">🧬 Inzuchtprüfer</a>
       <a class="btn secondary" href="verpaarung.html">💞 Verpaarungsratgeber</a>
       <a class="btn secondary" href="vergleich.html">👯 Fohlenvergleich</a>
@@ -73,7 +74,13 @@
 
     <div class="list-header">
       <span id="result-count" class="muted small"></span>
+      <button id="check-links-btn" class="secondary">🔍 Links/Spiel-IDs prüfen</button>
     </div>
+
+    <fieldset id="link-check-results" hidden>
+      <legend>Ergebnis: Links/Spiel-IDs-Prüfung</legend>
+      <div id="link-check-body"></div>
+    </fieldset>
 
     <div class="table-wrap">
       <table id="horse-table">

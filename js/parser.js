@@ -648,12 +648,20 @@ function buildDuplicateConfirmMessage(newName, existingName) {
 //   wichtig, wenn eine falsch zugeordnete hr_id einen komplett anderen
 //   Datensatz gefunden hat (siehe Vorfall 12.08.2026)
 // - "cancel": gar nicht speichern
+// "Als neues Pferd anlegen" wird nur angeboten, wenn sich die Namen
+// unterscheiden - sind sie identisch (Treffer über den eindeutigen Namen
+// gefunden), würde eine Neuanlage sofort am Namens-Index scheitern
+// ("duplicate key value violates unique constraint horses_name_unique_idx"),
+// da kann es sich nur um dasselbe Pferd handeln.
 function askDuplicateAction(newName, existingName) {
+  const differs = existingName && newName
+    && existingName.trim().toLowerCase() !== newName.trim().toLowerCase();
   document.querySelector('#duplicate-modal-message').textContent = buildDuplicateConfirmMessage(newName, existingName);
   document.querySelector('#duplicate-modal').hidden = false;
+  const newBtn = document.querySelector('#duplicate-modal-new');
+  newBtn.hidden = !differs;
   return new Promise((resolve) => {
     const cancelBtn = document.querySelector('#duplicate-modal-cancel');
-    const newBtn = document.querySelector('#duplicate-modal-new');
     const mergeBtn = document.querySelector('#duplicate-modal-merge');
     const cleanup = () => {
       document.querySelector('#duplicate-modal').hidden = true;

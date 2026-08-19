@@ -16,6 +16,7 @@ async function init() {
   document.querySelector('#horse-form').addEventListener('submit', onSaveAndNext);
   document.querySelector('#clear-btn').addEventListener('click', () => clearForm(false));
   document.querySelector('#f-image').addEventListener('paste', onImagePaste);
+  document.querySelector('#f-image').addEventListener('input', updateImagePreview);
   // Automatisch auslesen, sobald etwas in die Box eingefügt wird - kein
   // Extra-Klick nötig, damit viele Pferde schnell hintereinander gehen.
   document.querySelector('#paste-text').addEventListener('paste', () => setTimeout(onParse, 0));
@@ -51,6 +52,22 @@ async function onImagePaste(e) {
   }
   const { data } = supabaseClient.storage.from('horse-images').getPublicUrl(path);
   field.value = data.publicUrl;
+  updateImagePreview();
+}
+
+// Zeigt das Bild direkt im Formular an, sobald eine Bild-URL bekannt ist
+// (egal ob automatisch ausgelesen oder von Hand eingetragen) - gerade nach
+// den falsch zugeordneten Bildern/Links wichtig, um vor dem Speichern kurz
+// gegenzuchecken, ob das Bild wirklich zum Pferd passt.
+function updateImagePreview() {
+  const url = document.querySelector('#f-image').value.trim();
+  const img = document.querySelector('#f-image-preview');
+  if (!url || url === 'Bild wird hochgeladen...') {
+    img.hidden = true;
+    return;
+  }
+  img.src = url;
+  img.hidden = false;
 }
 
 // Liest zusätzlich zum reinen Text die HTML-Fassung der Zwischenablage aus
@@ -63,6 +80,7 @@ function onPasteTextHtml(e) {
   const extra = extractFromPasteHtml(html);
   if (extra.image_url) document.querySelector('#f-image').value = extra.image_url;
   if (extra.link) document.querySelector('#f-link').value = extra.link;
+  updateImagePreview();
 }
 
 function onParse() {
@@ -70,6 +88,7 @@ function onParse() {
   if (!raw.trim()) return;
   const parsed = parseHorseRealityText(raw);
   fillForm(parsed);
+  updateImagePreview();
   const status = document.querySelector('#parse-status');
   status.textContent = `Ausgelesen: ${parsed.name || 'kein Name erkannt'}`;
   setTimeout(() => { if (status.textContent.startsWith('Ausgelesen')) status.textContent = ''; }, 4000);
@@ -301,6 +320,7 @@ function clearForm(keepOwnerBreed) {
   ['#pedigree-fieldset', '#colors-fieldset', '#disciplines-fieldset', '#exterior-fieldset'].forEach((sel) => {
     document.querySelector(sel).hidden = true;
   });
+  updateImagePreview();
 
   if (keepOwnerBreed) {
     document.querySelector('#f-owner').value = owner;

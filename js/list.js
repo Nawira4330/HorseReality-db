@@ -13,6 +13,7 @@ async function init() {
 
   document.querySelector('#apply-filters-btn').addEventListener('click', render);
   document.querySelector('#reset-filters-btn').addEventListener('click', resetFilters);
+  document.querySelector('#check-links-btn').addEventListener('click', runLinkCheck);
   document.querySelectorAll('#horse-table th[data-sort]').forEach((th) => {
     th.addEventListener('click', () => {
       const field = th.dataset.sort;
@@ -149,6 +150,69 @@ async function deleteHorse(id) {
   }
   allHorses = allHorses.filter((h) => h.id !== id);
   render();
+}
+
+// --- Links/Spiel-IDs-Prüfung (einmaliger Diagnose-Check, siehe Vorfall
+// 12.08.2026: falsch zugeordnete hr_id/Links durch die inzwischen wieder
+// abgeschaltete automatische Link-Erkennung, siehe parser.js). Prüft rein
+// mechanisch, ob Link und Spiel-ID jedes Pferds zusammenpassen (die hr_id
+// steckt als Zahl im Link) - kein Zugriff auf horsereality.com nötig, nur
+// ein Abgleich der bereits gespeicherten Werte untereinander.
+function extractHrIdFromLink(link) {
+  if (!link) return null;
+  const m = link.match(/\/horses\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+function runLinkCheck() {
+  const mismatches = allHorses.filter((h) => {
+    const linkHrId = extractHrIdFromLink(h.link);
+    if (!h.link && !h.hr_id) return false;
+    return linkHrId !== h.hr_id;
+  });
+
+  const byHrId = new Map();
+  allHorses.forEach((h) => {
+    if (!h.hr_id) return;
+    if (!byHrId.has(h.hr_id)) byHrId.set(h.hr_id, []);
+    byHrId.get(h.hr_id).push(h);
+  });
+  const dupHrId = [...byHrId.values()].filter((list) => list.length > 1);
+
+  const byLink = new Map();
+  allHorses.forEach((h) => {
+    if (!h.link) return;
+    if (!byLink.has(h.link)) byLink.set(h.link, []);
+    byLink.get(h.link).push(h);
+  });
+  const dupLink = [...byLink.values()].filter((list) => list.length > 1);
+
+  const noLink = allHorses.filter((h) => !h.link);
+
+  renderLinkCheckResults({ mismatches, dupHrId, dupLink, noLink });
+}
+
+function linkCheckHorseListHtml(horses) {
+  return `<ul>${horses.map((h) => `<li><a href="horse.html?id=${h.id}" target="_blank">${escapeHtml(h.name)}</a>
+    <span class="muted small">- hr_id: ${escapeHtml(h.hr_id || '–')}, Link: ${h.link ? escapeHtml(h.link) : '–'}</span></li>`).join('')}</ul>`;
+}
+
+function renderLinkCheckResults({ mismatches, dupHrId, dupLink, noLink }) {
+  document.querySelector('#link-check-results').hidden = false;
+  let html = '';
+
+  html += `<p><strong>${mismatches.length}</strong> Pferd(e), bei denen Link und gespeicherte Spiel-ID nicht zusammenpassen:</p>`;
+  html += mismatches.length ? linkCheckHorseListHtml(mismatches) : '<p class="muted small">Keine gefunden.</p>';
+
+  html += `<p><strong>${dupHrId.length}</strong> Spiel-ID(s), die bei mehreren Pferden gleichzeitig steht:</p>`;
+  html += dupHrId.length ? dupHrId.map(linkCheckHorseListHtml).join('') : '<p class="muted small">Keine gefunden.</p>';
+
+  html += `<p><strong>${dupLink.length}</strong> Link(s), die bei mehreren Pferden gleichzeitig steht:</p>`;
+  html += dupLink.length ? dupLink.map(linkCheckHorseListHtml).join('') : '<p class="muted small">Keine gefunden.</p>';
+
+  html += `<p><strong>${noLink.length}</strong> Pferd(e) ganz ohne Link.</p>`;
+
+  document.querySelector('#link-check-body').innerHTML = html;
 }
 
 function showFlashBanner() {
